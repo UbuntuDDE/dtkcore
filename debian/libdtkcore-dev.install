@@ -1,0 +1,5 @@
+usr/include
+usr/lib/*/cmake/*/*.cmake
+usr/lib/*/lib*.so
+usr/lib/*/pkgconfig/*.pc
+usr/lib/*/qt5/*
