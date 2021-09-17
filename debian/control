@@ -10,7 +10,9 @@ Uploaders:
  Tu Qinggang <tuqinggang@uniontech.com>,
 Build-Depends:
  debhelper-compat (= 13),
+ libdtkcommon-dev,
  libgsettings-qt-dev,
+ libgtest-dev,
  pkg-config,
  qtbase5-dev,
  qtbase5-private-dev,
@@ -29,6 +31,7 @@ Depends:
  libdtkcore5 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
+ libdtkcommon-dev,
 Breaks:
  libdtkwidget-dev (<< 2.0.5.2-3),
 Replaces:
@@ -45,6 +48,7 @@ Architecture: any
 Multi-Arch: same
 Depends:
  lshw,
+ libdtkcommon,
  ${misc:Depends},
  ${shlibs:Depends},
 Description: Deepin Tool Kit Core library

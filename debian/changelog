@@ -1,3 +1,15 @@
+dtkcore (5.4.20-1ubuntu1) impish; urgency=medium
+
+  * Re-upload.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Fri, 17 Sep 2021 13:03:30 +0545
+
+dtkcore (5.4.20-1) impish; urgency=medium
+
+  * New upstream release 5.4.0.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Fri, 17 Sep 2021 01:27:01 +0545
+
 dtkcore (5.4.0-1ubuntu3) hirsute; urgency=medium
 
   * Rebuild for hirsute.
