@@ -46,12 +46,43 @@ void ThreadUtils::testCallInMainThread()
     auto fe = QtConcurrent::run([] {
         ASSERT_TRUE(DThreadUtil::runInMainThread([](QThread *thread) -> bool {
             return QThread::currentThread() == QCoreApplication::instance()->thread() && QThread::currentThread() != thread;
-        }, QThread::currentThread()));
+        },
+                                                 QThread::currentThread()));
     });
 
     ASSERT_TRUE(QTest::qWaitFor([&] {
         return fe.isFinished();
     }));
+
+    {
+        // 测试target对象销毁后是否还会触发函数调用
+        QPointer<QObject> object = new QObject();
+        bool test = true;
+        auto result1 = QtConcurrent::run([&test, object] {
+            test = DThreadUtil::runInMainThread(object, [object]() -> bool {
+                if (!object)
+                    return false;
+
+                delete object.data();
+                return true;
+            });
+        });
+        auto result2 = QtConcurrent::run([&test, object] {
+            test = DThreadUtil::runInMainThread(object, [object]() -> bool {
+                if (!object)
+                    return false;
+
+                delete object.data();
+                return true;
+            });
+        });
+
+        ASSERT_TRUE(QTest::qWaitFor([&] {
+            return result1.isFinished() && result2.isFinished();
+        }));
+
+        ASSERT_TRUE(!test);
+    }
 }
 
 class ut_DThreadUtils : public testing::Test
