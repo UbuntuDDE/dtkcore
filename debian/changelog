@@ -1,3 +1,9 @@
+dtkcore (5.5.17.1-1) impish; urgency=medium
+
+  * New upstream release.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Sat, 18 Sep 2021 13:33:34 +0545
+
 dtkcore (5.4.20-1ubuntu1) impish; urgency=medium
 
   * Re-upload.

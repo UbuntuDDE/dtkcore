@@ -17,9 +17,18 @@ include /usr/share/dpkg/architecture.mk
 # Retrieve version info
 include /usr/share/dpkg/default.mk
 
+VERSION = $(DEB_VERSION_UPSTREAM)
+_PACK_VER = $(shell echo $(VERSION) | awk -F'[+_~-]' '{print $$1}')
+_BUILD_VER = $(shell echo $(VERSION) | awk -F'[+_~-]' '{print $$2}' | sed 's/[^0-9]//g')
+ifeq ($(_BUILD_VER),)
+	CONFIG_VERSION = $(_PACK_VER)
+else
+	CONFIG_VERSION = $(_PACK_VER).$(_BUILD_VER)
+endif
+
 %:
 	dh $@
 
 override_dh_auto_configure:
-	dh_auto_configure -- LIB_INSTALL_DIR=/usr/lib/$(DEB_HOST_MULTIARCH) VERSION=$(DEB_VERSION_UPSTREAM)
+	dh_auto_configure -- LIB_INSTALL_DIR=/usr/lib/$(DEB_HOST_MULTIARCH) VERSION=$(VERSION)
 
