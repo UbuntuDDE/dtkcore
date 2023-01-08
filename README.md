@@ -1,14 +1,20 @@
-## Deepin Tool Kit Core {#mainpage}
+## Deepin Tool Kit Core
 
-Deepint Tool Kit (Dtk) is the base development tool of all C++/Qt Developer work on Deepin.
+Deepin Tool Kit (DtkCore) is the base development tool of all C++/Qt Developer work on Deepin.
 
-You should read the [Deepin Application Specification](\ref doc/Specification) firstly.
+You should read the <a href=docs/Specification.md>Deepin Application Specification</a> firstly.
+
+中文说明：[README.zh_CN.md](./README.zh_CN.md)
+
+## Document
+
+中文文档：[dtkcore文档（测试版本）](https://linuxdeepin.github.io/dtkcore/index.html)
 
 ## Dependencies
 
 ### Build dependencies
 
-* Qt >= 5.6
+* Qt >= 5.10
 
 ## Installation
 
@@ -18,25 +24,26 @@ You should read the [Deepin Application Specification](\ref doc/Specification) f
 
 2. Build:
 
-````
-$ mkdir build
-$ cd build
-$ qmake ..
-$ make
-````
+```bash
+mkdir build
+cd build
+cmake ..
+make
+```
 
 3. Install:
 
-````
-$ sudo make install
-````
+```bash
+sudo make install
+```
 
 ## Getting help
 
 Any usage issues can ask for help via
 
-* [Gitter](https://gitter.im/orgs/linuxdeepin/rooms)
-* [IRC channel](https://webchat.freenode.net/?channels=deepin)
+* [Telegram group](https://t.me/deepin)
+* [Matrix](https://matrix.to/#/#deepin-community:matrix.org)
+* [IRC (libera.chat)](https://web.libera.chat/#deepin-community)
 * [Forum](https://bbs.deepin.org)
 * [WiKi](https://wiki.deepin.org/)
 
@@ -44,9 +51,8 @@ Any usage issues can ask for help via
 
 We encourage you to report issues and contribute changes
 
-* [Contribution guide for developers](https://github.com/linuxdeepin/developer-center/wiki/Contribution-Guidelines-for-Developers-en). (English)
-* [开发者代码贡献指南](https://github.com/linuxdeepin/developer-center/wiki/Contribution-Guidelines-for-Developers) (中文)
+* [Contribution guide for developers](https://github.com/linuxdeepin/developer-center/wiki/Contribution-Guidelines-for-Developers-en).
 
 ## License
 
-deepin-tool-kit is licensed under [GPLv3](LICENSE).
+deepin-tool-kit is licensed under [LGPL-3.0-or-later](LICENSE).

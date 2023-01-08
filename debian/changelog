@@ -1,3 +1,39 @@
+dtkcore (5.6.4) unstable; urgency=medium
+
+  * Release 5.6.4
+
+ -- Deepin Packages Builder <packages@deepin.com>  Fri, 06 Jan 2023 16:30:40 +0800
+
+dtkcore (5.6.3) unstable; urgency=medium
+
+  * Release 5.6.3
+
+ -- Deepin Packages Builder <packages@deepin.com>  Mon, 12 Dec 2022 14:40:31 +0800
+
+dtkcore (5.6.2.2) unstable; urgency=medium
+
+  * release 5.6.2.2
+
+ -- Deepin Packages Builder <packages@deepin.com>  Thu, 17 Nov 2022 17:41:10 +0800
+
+dtkcore (5.6.2.1) unstable; urgency=medium
+
+  * snipe release 5.6.2.1
+
+ -- Deepin Packages Builder <packages@deepin.com>  Mon, 31 Oct 2022 16:53:16 +0800
+
+dtkcore (5.6.2) unstable; urgency=medium
+
+  * snipe release 5.6.2
+
+ -- Deepin Packages Builder <packages@deepin.com>  Wed, 21 Sep 2022 13:57:29 +0800
+
+dtkcore (5.6.0) unstable; urgency=medium
+
+  * snipe release 5.6.0
+
+ -- Deepin Packages Builder <packages@deepin.com>  Mon, 11 Jul 2022 17:47:56 +0800
+
 dtkcore (5.0.3) unstable; urgency=medium
 
   * Release 5.0.3

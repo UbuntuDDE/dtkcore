@@ -1,35 +1,6 @@
-/****************************************************************************
-**
-** Copyright (C) 2015 The Qt Company Ltd.
-** Contact: http://www.qt.io/licensing/
-**
-** This file is part of the tools applications of the Qt Toolkit.
-**
-** $QT_BEGIN_LICENSE:LGPL21$
-** Commercial License Usage
-** Licensees holding valid commercial Qt licenses may use this file in
-** accordance with the commercial license agreement provided with the
-** Software or, alternatively, in accordance with the terms contained in
-** a written agreement between you and The Qt Company. For licensing terms
-** and conditions see http://www.qt.io/terms-conditions. For further
-** information use the contact form at http://www.qt.io/contact-us.
-**
-** GNU Lesser General Public License Usage
-** Alternatively, this file may be used under the terms of the GNU Lesser
-** General Public License version 2.1 or version 3 as published by the Free
-** Software Foundation and appearing in the file LICENSE.LGPLv21 and
-** LICENSE.LGPLv3 included in the packaging of this file. Please review the
-** following information to ensure the GNU Lesser General Public License
-** requirements will be met: https://www.gnu.org/licenses/lgpl.html and
-** http://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
-**
-** As a special exception, The Qt Company gives you certain additional
-** rights. These rights are described in The Qt Company LGPL Exception
-** version 1.1, included in the file LGPL_EXCEPTION.txt in this package.
-**
-** $QT_END_LICENSE$
-**
-****************************************************************************/
+// SPDX-FileCopyrightText: 2016 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include <qbytearray.h>
 #include <qdebug.h>
@@ -97,7 +68,7 @@ static const char includeList[] =
     "#include <QtCore/QStringList>\n"
     "#include <QtCore/QVariant>\n"
     "\n"
-    "#include <DBusExtendedAbstractInterface>\n";
+    "#include <DDBusExtendedAbstractInterface>\n";
 
 static const char forwardDeclarations[] =
     "QT_BEGIN_NAMESPACE\n"
@@ -633,6 +604,9 @@ static void writeProxy(const QString &filename, const QDBusIntrospection::Interf
     foreach (const QDBusIntrospection::Interface *interface, interfaces) {
         QString className = "__" + classNameForInterface(interface->name, Proxy);
 
+        // using namespace Dtk::Core in cpp
+        cs << "DCORE_USE_NAMESPACE" << endl;
+
         // comment:
         hs << "/*" << endl
            << " * Proxy class for interface " << interface->name << endl
@@ -644,8 +618,8 @@ static void writeProxy(const QString &filename, const QDBusIntrospection::Interf
 
         // private class declare
         hs << "class " << className << "Private;" << endl;
-        // class header:
-        hs << "class " << className << " : public DBusExtendedAbstractInterface" << endl
+        // class header: add Dtk::Core
+        hs << "class " << className << " : public DTK_CORE_NAMESPACE::DDBusExtendedAbstractInterface" << endl
            << "{" << endl
            << "    Q_OBJECT" << endl;
         hs << endl;
@@ -688,7 +662,7 @@ static void writeProxy(const QString &filename, const QDBusIntrospection::Interf
            << "    ~" << className << "();" << endl
            << endl;
         cs << className << "::" << className << "(const QString &service, const QString &path, const QDBusConnection &connection, QObject *parent)" << endl
-           << "    : DBusExtendedAbstractInterface(service, path, staticInterfaceName(), connection, parent)" << endl
+           << "    : DDBusExtendedAbstractInterface(service, path, staticInterfaceName(), connection, parent)" << endl
            << "    , d_ptr(new " << className << "Private)" << endl
            << "{" << endl;
         if (!interface->properties.isEmpty())

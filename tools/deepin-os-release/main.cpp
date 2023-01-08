@@ -1,23 +1,7 @@
-/*
- * Copyright (C) 2017 ~ 2018 Deepin Technology Co., Ltd.
- *
- * Author:     zccrs <zccrs@live.com>
- *
- * Maintainer: zccrs <zhangjide@deepin.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2017 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 #include "dsysinfo.h"
 
 #include <QCoreApplication>
@@ -77,7 +61,7 @@ int main(int argc, char *argv[])
         printf("Memory Size: %f GiB\n", DSysInfo::memoryTotalSize() / 1024.0 / 1024 / 1024);
         printf("Disk Size: %f GiB\n", DSysInfo::systemDiskSize() / 1024.0 / 1024 / 1024);
 
-        if (DSysInfo::isDDE()) {
+        if (DSysInfo::isDeepin() && DSysInfo::isDDE()) {
             printf("Deepin Type: %s\n", qPrintable(DSysInfo::deepinTypeDisplayName()));
             printf("Deepin Version: %s\n", qPrintable(DSysInfo::deepinVersion()));
 
@@ -92,15 +76,16 @@ int main(int argc, char *argv[])
         printf("Product Type: %s\n", qPrintable(DSysInfo::productTypeString()));
         printf("Product Version: %s\n", qPrintable(DSysInfo::productVersion()));
 
-        printf("Uos Product Name: %s\n", qPrintable(DSysInfo::uosProductTypeName()));
-        printf("Uos SystemName Name: %s\n", qPrintable(DSysInfo::uosSystemName()));
-        printf("Uos Edition Name: %s\n", qPrintable(DSysInfo::uosEditionName()));
-        printf("Uos SP Version: %s\n", qPrintable(DSysInfo::spVersion()));
-        printf("Uos update Version: %s\n", qPrintable(DSysInfo::udpateVersion()));
-        printf("Uos major Version: %s\n", qPrintable(DSysInfo::majorVersion()));
-        printf("Uos minor Version: %s\n", qPrintable(DSysInfo::minorVersion()));
-        printf("Uos build Version: %s\n", qPrintable(DSysInfo::buildVersion()));
-
+        if (DSysInfo::isDeepin()) {
+            printf("Uos Product Name: %s\n", qPrintable(DSysInfo::uosProductTypeName()));
+            printf("Uos SystemName Name: %s\n", qPrintable(DSysInfo::uosSystemName()));
+            printf("Uos Edition Name: %s\n", qPrintable(DSysInfo::uosEditionName()));
+            printf("Uos SP Version: %s\n", qPrintable(DSysInfo::spVersion()));
+            printf("Uos update Version: %s\n", qPrintable(DSysInfo::udpateVersion()));
+            printf("Uos major Version: %s\n", qPrintable(DSysInfo::majorVersion()));
+            printf("Uos minor Version: %s\n", qPrintable(DSysInfo::minorVersion()));
+            printf("Uos build Version: %s\n", qPrintable(DSysInfo::buildVersion()));
+        }
         if (distributionInfoValid()) {
             printDistributionOrgInfo(DSysInfo::Distribution);
             printDistributionOrgInfo(DSysInfo::Distributor);

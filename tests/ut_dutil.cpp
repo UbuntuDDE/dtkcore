@@ -1,19 +1,6 @@
-/*
- * Copyright (C) 2017 ~ 2017 Deepin Technology Co., Ltd.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2017 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "ut_dutil.h"
 
@@ -23,6 +10,7 @@
 #include <QDBusReply>
 #include <QDir>
 #include <DDesktopEntry>
+#include <QTest>
 
 #include "log/LogManager.h"
 #include "filesystem/dpathbuf.h"
@@ -34,6 +22,7 @@
 #include "settings/dsettingsgroup.h"
 #include "settings/dsettingsoption.h"
 #include "dsysinfo.h"
+#include "base/dsingleton.h"
 
 DCORE_USE_NAMESPACE
 
@@ -71,20 +60,23 @@ TEST_F(ut_DUtil, testDefaultLogPath)
     qputenv("HOME", home);
 }
 
-TEST_F(ut_DUtil, testLogPath)
+TEST_F(ut_DUtil, testDLogManager)
 {
     qApp->setOrganizationName("deepin");
     qApp->setApplicationName("deepin-test-dtk");
 
-    DPathBuf logPath(QStandardPaths::standardLocations(QStandardPaths::HomeLocation).first());
+    DPathBuf logPath(QStandardPaths::standardLocations(QStandardPaths::CacheLocation).first());
 
 #ifdef Q_OS_OSX
-    logPath = logPath / "Library" / "Caches" / "deepin" / "deepin-test-dtk" / "deepin-test-dtk.log";
+    logPath = logPath / "deepin-test-dtk.log";
 #else
-    logPath = logPath / ".cache" / "deepin" / "deepin-test-dtk" / "deepin-test-dtk.log";
+    logPath = logPath / "deepin-test-dtk.log";
 #endif
 
     ASSERT_EQ(DLogManager::getlogFilePath(), logPath.toString());
+    DLogManager::registerFileAppender();
+    DLogManager::registerConsoleAppender();
+    DLogManager::setlogFilePath("%{time}{yyyy-MM-dd, HH:mm:ss.zzz} [%{type:-7}] [%{file:-20} %{function:-35} %{line}] %{message}\n");
 }
 
 TEST_F(ut_DUtil, testSetInvalidLogPath)
@@ -111,28 +103,42 @@ TEST_F(ut_DUtil, testPathChange)
 
 TEST_F(ut_DUtil, testDSingleton)
 {
-    auto threadA = new QThread;
-    auto testerA = new MultiSingletonTester;
-    QObject::connect(threadA, &QThread::started, testerA, &MultiSingletonTester::run);
-    QObject::connect(threadA, &QThread::finished, testerA, [=]() {
-        threadA->deleteLater();
-        testerA->deleteLater();
-    });
-    testerA->moveToThread(threadA);
+    const int exampleCount = 5;
+    QVector<QThread*> threads;
+    QVector<MultiSingletonTester*> testers;
+    threads.reserve(exampleCount);
+    testers.reserve(exampleCount);
+    for (int i = 0; i < exampleCount; i++) {
+        auto thread = new QThread();
+        auto tester = new MultiSingletonTester;
+        tester->moveToThread(thread);
+        QObject::connect(thread, &QThread::started, tester, &MultiSingletonTester::run);
 
-    auto threadB = new QThread;
-    auto testerB = new MultiSingletonTester;
-    testerB->moveToThread(threadB);
-    QObject::connect(threadB, &QThread::started, testerB, &MultiSingletonTester::run);
-    QObject::connect(threadB, &QThread::finished, testerB, [=]() {
-        threadB->deleteLater();
-        testerB->deleteLater();
-    });
+        threads.push_back(thread);
+        testers.push_back(tester);
+        thread->start();
+    }
 
-    threadA->start();
-    threadB->start();
+    for (auto thread : threads) {
+        thread->quit();
+    }
 
-    QThread::sleep(5);
+    ASSERT_TRUE(QTest::qWaitFor([threads] {
+        for (auto thread : threads) {
+            if (!thread->isFinished()) {
+                return false;
+            }
+        }
+        return true;
+    }));
+
+    for (auto tester : testers) {
+        ASSERT_EQ(tester->count(), exampleCount);
+    }
+
+    qDeleteAll(threads);
+    qDeleteAll(testers);
+    delete DSingleton<int>::instance();
 }
 
 TEST_F(ut_DUtil, testTimeFormatter)
@@ -290,7 +296,7 @@ TEST_F(ut_DUtil, testOsVersion)
     entry.setStringValue("专业版", "EditionName[zh_CN]", "Version");
     entry.setStringValue("20", "MajorVersion", "Version");
     entry.setStringValue("100A", "MinorVersion", "Version");
-    entry.setStringValue("11018.107", "OsBuild", "Version");
+    entry.setStringValue("11Z18.107.109", "OsBuild", "Version");
     ASSERT_TRUE(entry.save());
 
     ASSERT_TRUE(DSysInfo::uosSystemName(QLocale("C")) == "UnionTech OS Desktop");
@@ -301,7 +307,7 @@ TEST_F(ut_DUtil, testOsVersion)
     ASSERT_TRUE(DSysInfo::uosEditionName(QLocale("C")) == "Professional");
     ASSERT_TRUE(DSysInfo::majorVersion() == "20");
     ASSERT_TRUE(DSysInfo::minorVersion() == "100A");
-    ASSERT_TRUE(DSysInfo::buildVersion() == "107");
+    ASSERT_TRUE(DSysInfo::buildVersion() == "107.109");
 
     // test minVersion.BC SP1….SP99
     for (int i = 0; i < 100; ++i) {
@@ -460,4 +466,56 @@ TEST_F(ut_DUtil, testOsVersion)
     ASSERT_TRUE(DSysInfo::udpateVersion() == QStringLiteral(""));
 
     QFile::remove("/tmp/etc/os-version");
+}
+
+TEST_F(ut_DUtil, testDDesktopEntry)
+{
+    DDesktopEntry entry("/tmp/etc/os-version");
+    entry.setStringValue("UnionTech OS Desktop", "SystemName", "Version");
+    entry.setStringValue("统信桌面操作系统", "SystemName[zh_CN]", "Version");
+    entry.setStringValue("Desktop", "ProductType", "Version");
+    entry.setStringValue("桌面", "ProductType[zh_CN]", "Version");
+    entry.setStringValue("Professional", "EditionName", "Version");
+    entry.setStringValue("专业版", "EditionName[zh_CN]", "Version");
+    entry.setStringValue("20", "MajorVersion", "Version");
+    entry.setStringValue("100A", "MinorVersion", "Version");
+    entry.setStringValue("11018.107", "OsBuild", "Version");
+    ASSERT_TRUE(entry.save());
+    ASSERT_TRUE(entry.name().isEmpty());
+    ASSERT_TRUE(entry.genericName().isEmpty());
+    ASSERT_TRUE(entry.ddeDisplayName().isEmpty());
+    ASSERT_TRUE(entry.comment().isEmpty());
+    QString slash("\\\\");
+    ASSERT_TRUE(entry.escapeExec(slash) == slash);
+    ASSERT_TRUE(entry.unescapeExec(slash) == slash);
+}
+
+TEST_F(ut_DUtil, testDSysInfo)
+{
+    DSysInfo::distributionOrgWebsite();
+    DSysInfo::distributionOrgLogo(DSysInfo::Distribution, DSysInfo::Normal);
+    DSysInfo::distributionOrgLogo(DSysInfo::Distribution, DSysInfo::Light);
+    DSysInfo::distributionOrgLogo(DSysInfo::Distribution, DSysInfo::Symbolic);
+    DSysInfo::distributionOrgLogo(DSysInfo::Distribution, DSysInfo::Transparent);
+    qDebug() << DSysInfo::distributionOrgName(DSysInfo::Distribution);
+    qDebug() << DSysInfo::distributionOrgName(DSysInfo::Distributor);
+    qDebug() << DSysInfo::distributionOrgName(DSysInfo::Manufacturer);
+    qDebug() << DSysInfo::isDeepin();
+    qDebug() << DSysInfo::isDDE();
+    qDebug() << DSysInfo::productType();
+    qDebug() << DSysInfo::productTypeString();
+    qDebug() << DSysInfo::productVersion();
+    qDebug() << DSysInfo::cpuModelName();
+    qDebug() << DSysInfo::operatingSystemName();
+    qDebug() << DSysInfo::deepinType();
+    qDebug() << DSysInfo::deepinTypeDisplayName();
+    qDebug() << DSysInfo::deepinVersion();
+    qDebug() << DSysInfo::deepinEdition();
+    qDebug() << DSysInfo::deepinCopyright();
+    qDebug() << DSysInfo::distributionInfoPath().size();
+    qDebug() << DSysInfo::isCommunityEdition();
+    qDebug() << DSysInfo::computerName();
+    qDebug() << DSysInfo::memoryInstalledSize();
+    qDebug() << DSysInfo::memoryTotalSize();
+    qDebug() << DSysInfo::systemDiskSize();
 }
