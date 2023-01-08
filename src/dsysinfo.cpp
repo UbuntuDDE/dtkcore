@@ -1,23 +1,7 @@
-/*
- * Copyright (C) 2017 ~ 2018 Deepin Technology Co., Ltd.
- *
- * Author:     zccrs <zccrs@live.com>
- *
- * Maintainer: zccrs <zhangjide@deepin.com>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2017 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
 #include "dsysinfo.h"
 #include "ddesktopentry.h"
 
@@ -31,6 +15,8 @@
 #include <QJsonArray>
 #include <QSettings>
 #include <QStandardPaths>
+#include <QDateTime>
+#include <qmath.h>
 
 #ifdef Q_OS_LINUX
 #include <sys/sysinfo.h>
@@ -60,7 +46,7 @@ public:
     void ensureReleaseInfo();
     void ensureComputerInfo();
     QMap<QString, QString> parseInfoFile(QFile &file);
-
+    QMap<QString, QString> parseInfoContent(const QString &content);
 #ifdef Q_OS_LINUX
     DSysInfo::DeepinType deepinType = DSysInfo::DeepinType(-1);
     QMap<QString, QString> deepinTypeMap; //Type Name with Language
@@ -72,9 +58,9 @@ public:
     QString minorVersion;
     struct MinVersion {
         enum Type {
-            A_BC_D, // 专业版
-            X_Y_Z, // 家庭版
-            A_B_C // 社区版
+            A_BC_D, /*!< Professional Edition*/
+            X_Y_Z,  /*!< Home Edition*/
+            A_B_C  /*!< Community Edition*/
         };
         MinVersion()
             : A(0)
@@ -232,7 +218,7 @@ void DSysInfoPrivate::ensureDeepinInfo()
 
 bool DSysInfoPrivate::ensureOsVersion()
 {
-#ifndef OS_VERSION_TEST_FILE // 测试时总是重新读取文件
+#ifndef OS_VERSION_TEST_FILE // Always re-read the file when testing
     if (osBuild.A > 0)
         return true;
 #endif
@@ -240,24 +226,40 @@ bool DSysInfoPrivate::ensureOsVersion()
     DDesktopEntry entry(OS_VERSION_FILE);
     bool ok = false;
 
+#define D_ASSET_EXIT(con, msg) do { \
+    if (!(con)) { \
+        qWarning() << __func__ << msg; \
+        return false; \
+    } \
+} while (false)
+
+    D_ASSET_EXIT(entry.status() == DDesktopEntry::NoError, entry.status());
+
     // 先获取版本信息
-    // ABCDE.xyz
+    // ABCDE.xyz.abc
     QString osb = entry.stringValue("OsBuild", "Version");
     QStringList osbs = osb.split(".");
-    Q_ASSERT(osbs.size() == 2 && osbs.value(0).size() == 5);
-    uint left = osbs.value(0).trimmed().toUInt(&ok);
-    Q_ASSERT(ok);
-    if (ok) {
-        osBuild.E = left % 10;
-        left /= 10;
-        osBuild.D = left % 10;
-        left /= 10;
-        osBuild.C = left % 10; // default C is 0
-        left /= 10;
-        osBuild.B = left % 10;
-        left /= 10;
-        osBuild.A = left % 10;
+    ok = (osbs.size() >= 2 && osbs.value(0).size() == 5);
+    D_ASSET_EXIT(ok, "OsBuild version invalid!");
+
+    const QStringList &left = osbs.value(0).split(QString(), QString::SkipEmptyParts);
+    D_ASSET_EXIT(left.size() == 5, "OsBuild version(ls) invalid!");
+
+    int idx = 0;
+    osBuild.A = left.value(idx++, "0").toUInt(&ok);
+    D_ASSET_EXIT(ok, "OsBuild version(A) invalid!");
+    osBuild.B = left.value(idx++, "0").toUInt(&ok);
+    D_ASSET_EXIT(ok, "OsBuild version(B) invalid!");
+    osBuild.C = left.value(idx++, "0").toUInt(&ok);
+    if (!ok) {
+        auto c = left.value(idx-1, "0").toLatin1();
+        D_ASSET_EXIT(c.size()>0, "OsBuild version(C) invalid!");
+        osBuild.C = uint(c.at(0));
     }
+    osBuild.D = left.value(idx++, "0").toUInt(&ok);
+    D_ASSET_EXIT(ok, "OsBuild version(D) invalid!");
+    osBuild.E = left.value(idx++, "0").toUInt(&ok);
+    D_ASSET_EXIT(ok, "OsBuild version(E) invalid!");
 
     // xyz
     osBuild.xyz = osbs.value(1).trimmed().toUInt(&ok);
@@ -267,19 +269,19 @@ bool DSysInfoPrivate::ensureOsVersion()
 
     switch (osBuild.D) {
     case 7: {
-        // 家庭版使用“完整版本号编码-X.Y.Z”的形式
+        // Home Edition uses the form of "full version number coding -x.y.z"
         const QStringList &versionList = minorVersion.split('.');
         if (versionList.isEmpty()) {
-            // 如果读取失败直接返回为空
+            // If the reading fails, return it directly to empty
             qWarning() << "no minorVersion";
             return false;
         } else if (versionList.length() == 2) {
-            // Z为0
+            // Z is 0
             minVersion.X = versionList.first().toUInt();
             minVersion.Y = versionList.last().toUInt();
             minVersion.Z = 0;
         } else if (versionList.length() == 3) {
-            // X.Y.Z都存在
+            // X.Y.Z exists
             minVersion.X = versionList.at(0).toUInt();
             minVersion.Y = versionList.at(1).toUInt();
             minVersion.Z = versionList.at(2).toUInt();
@@ -288,32 +290,32 @@ bool DSysInfoPrivate::ensureOsVersion()
     } break;
 
     case 3: {
-        // 社区版使用“完整版本号编码-A.B.C”的形式
+        // The community version uses the form of "full version number coding A.B.C"
         bool a_bc_dMode = false;
         const QStringList &versionList = minorVersion.split('.');
         if (versionList.isEmpty()) {
-            // 如果读取失败直接返回为空
+            // If the reading fails, return it directly to empty
             qWarning() << "no minorVersion";
             return false;
         } else if (versionList.length() == 1) {
             QString modeVersion = versionList.first();
             if (modeVersion.length() == 2) {
-                //A.B.C模式且B C 为0
+                //A.B.C mode and B c are 0
                 minVersion.A = modeVersion.toUInt();
                 minVersion.B = 0;
                 minVersion.C = 0;
             } else {
-                // A_BC_D模式
+                // A_BC_D mode
                 splitA_BC_DMode();
                 a_bc_dMode = true;
             }
         } else if (versionList.length() == 2) {
-            // C为0
+            // C=0
             minVersion.A = versionList.first().toUInt();
             minVersion.B = versionList.last().toUInt();
             minVersion.C = 0;
         } else if (versionList.length() == 3) {
-            // A.B.C都存在
+            // A.B.C exists
             minVersion.A = versionList.at(0).toUInt();
             minVersion.B = versionList.at(1).toUInt();
             minVersion.C = versionList.at(2).toUInt();
@@ -438,6 +440,11 @@ void DSysInfoPrivate::ensureReleaseInfo()
             if (productTypeString.compare("fedora", Qt::CaseInsensitive) == 0)
                 productType = DSysInfo::Fedora;
             break;
+        case 'g':
+        case 'G':
+            if (productTypeString.compare("gentoo", Qt::CaseInsensitive) == 0)
+                productType = DSysInfo::Gentoo;
+            break;
         case 'l':
         case 'L':
             if (productTypeString.compare("linuxmint", Qt::CaseInsensitive) == 0)
@@ -447,6 +454,11 @@ void DSysInfoPrivate::ensureReleaseInfo()
         case 'M':
             if (productTypeString.compare("manjaro", Qt::CaseInsensitive) == 0)
                 productType = DSysInfo::Manjaro;
+            break;
+        case 'n':
+        case 'N':
+            if (productTypeString.compare("nixos", Qt::CaseInsensitive) == 0)
+                productType = DSysInfo::NixOS;
             break;
         case 'o':
         case 'O':
@@ -476,93 +488,8 @@ void DSysInfoPrivate::ensureReleaseInfo()
 
 void DSysInfoPrivate::ensureComputerInfo()
 {
-    if (memoryAvailableSize >= 0)
-        return;
-
 #ifdef Q_OS_LINUX
-    struct utsname u;
-    if (uname(&u) == 0)
-        computerName = QString::fromLatin1(u.nodename);
 
-    QFile file("/proc/cpuinfo");
-
-    if (file.open(QFile::ReadOnly)) {
-        QMap<QString, QString> map = parseInfoFile(file);
-        if (map.contains("Processor")) {
-            // arm-cpuinfo hw_kirin-cpuinfo
-            cpuModelName = map.value("Processor");
-        } else if (map.contains("model name")) {
-            // cpuinfo
-            cpuModelName = map.value("model name");
-        } else if (map.contains("cpu model")) {
-            // loonson3-cpuinfo sw-cpuinfo
-            cpuModelName = map.value("cpu model");
-        }
-
-        file.close();
-    }
-
-    memoryAvailableSize = get_phys_pages() * sysconf(_SC_PAGESIZE);
-
-    // Getting Memory Installed Size
-    // TODO: way to not dept on lshw?
-    if (!QStandardPaths::findExecutable("lshw").isEmpty()) {
-        QProcess lshw;
-
-        lshw.start("lshw", {"-c", "memory", "-json", "-sanitize"}, QIODevice::ReadOnly);
-
-        if (!lshw.waitForFinished()) {
-            return;
-        }
-
-        const QByteArray &lshwInfoJson = lshw.readAllStandardOutput();
-        QJsonArray lshwResultArray = QJsonDocument::fromJson(lshwInfoJson).array();
-        if (!lshwResultArray.isEmpty()) {
-            QJsonValue memoryHwInfo = lshwResultArray.first();
-            QString id = memoryHwInfo.toObject().value("id").toString();
-            Q_ASSERT(id == "memory");
-            memoryInstalledSize = memoryHwInfo.toObject().value("size").toDouble(); // TODO: check "units" is "bytes" ?
-        }
-    }
-
-    // Getting Disk Size
-    const QString &deviceName = QStorageInfo::root().device();
-    QProcess lsblk;
-
-    lsblk.start("lsblk", {"-Jlpb", "-oNAME,KNAME,PKNAME,SIZE"}, QIODevice::ReadOnly);
-
-    if (!lsblk.waitForFinished()) {
-        return;
-    }
-
-    const QByteArray &diskStatusJson = lsblk.readAllStandardOutput();
-    QJsonDocument diskStatus = QJsonDocument::fromJson(diskStatusJson);
-    QJsonValue diskStatusJsonValue = diskStatus.object().value("blockdevices");
-    QMap<QString, QPair<QString, qulonglong>> deviceParentAndSizeMap;
-
-    if (!diskStatusJsonValue.isUndefined()) {
-        QJsonArray diskStatusArray = diskStatusJsonValue.toArray();
-        QString keyName;
-
-        for (const QJsonValue oneValue : diskStatusArray) {
-            QString name = oneValue.toObject().value("name").toString();
-            QString kname = oneValue.toObject().value("kname").toString();
-            QString pkname = oneValue.toObject().value("pkname").toString();
-            qulonglong size = oneValue.toObject().value("size").toVariant().toULongLong();
-
-            if (keyName.isNull() && deviceName == name) {
-                keyName = kname;
-            }
-
-            deviceParentAndSizeMap[kname] = QPair<QString, qulonglong>(pkname, size);
-        }
-
-        while (!deviceParentAndSizeMap[keyName].first.isNull()) {
-            keyName = deviceParentAndSizeMap[keyName].first;
-        }
-
-        diskSize = deviceParentAndSizeMap[keyName].second;
-    }
 #endif
 }
 
@@ -584,6 +511,21 @@ QMap<QString, QString> DSysInfoPrivate::parseInfoFile(QFile &file)
     return map;
 }
 
+QMap<QString, QString> DSysInfoPrivate::parseInfoContent(const QString &content)
+{
+    QMap<QString, QString> map;
+    QStringList lineContents = content.split("\n");
+    for (auto lineContent : lineContents) {
+        if (lineContent.contains(':')) {
+            QStringList list = lineContent.split(':');
+            if (list.size() == 2) {
+                map.insert(list.first().trimmed(), list.back().trimmed());
+            }
+        }
+    }
+    return map;
+}
+
 Q_GLOBAL_STATIC(DSysInfoPrivate, siGlobal)
 
 QString DSysInfo::operatingSystemName()
@@ -595,8 +537,8 @@ QString DSysInfo::operatingSystemName()
 
 #ifdef Q_OS_LINUX
 /*!
- * \brief Check current distro is Deepin or not.
- * \note Uos will also return true.
+  \brief Check current distro is Deepin or not.
+  \note Uos will also return true.
  */
 bool DSysInfo::isDeepin()
 {
@@ -607,6 +549,10 @@ bool DSysInfo::isDeepin()
 
 bool DSysInfo::isDDE()
 {
+    if (!DSysInfo::isDeepin()) {
+        return qgetenv("XDG_SESSION_DESKTOP") == "deepin";
+    }
+
     siGlobal->ensureDeepinInfo();
 
     return siGlobal->deepinType != UnknownDeepin;
@@ -648,12 +594,15 @@ QString DSysInfo::deepinCopyright()
 }
 
 /*!
- * \~chinese \brief DSysInfo::osType 系统类型
- * \~chinese \row 显示系统类型【1：桌面】【2：服务器】【3：专用设备】
- * \~chinese \note 根据 osBuild.B 判断
+@~english
+  \brief
+  Display system type [1: desktop] [2: server] [3: special devices]
+  \note 根据 osBuild.B 判断
  */
 DSysInfo::UosType DSysInfo::uosType()
 {
+    if (!DSysInfo::isDeepin())
+        return UosTypeUnknown;
     siGlobal->ensureOsVersion();
 
     UosType ost = UosTypeUnknown;
@@ -665,9 +614,10 @@ DSysInfo::UosType DSysInfo::uosType()
 }
 
 /*!
- * \~chinese \brief DSysInfo::osEditionType 版本类型
- * \~chinese \row 显示版本类型 专业版/个人版/社区版...
- * \~chinese \note 根据 osBuild.B && osBuild.D
+@~english
+  \brief
+  Editions: professional version/personal version/community version ...
+  \note According to osbuild.b && osbuild.d
  */
 DSysInfo::UosEdition DSysInfo::uosEditionType()
 {
@@ -679,7 +629,7 @@ DSysInfo::UosEdition DSysInfo::uosEditionType()
             return UosProfessional;
         case 2:
         case 7:
-            // 新版本家庭版(7)与旧版本个人版(2)同为Home 不修改旧有逻辑的情况下新增7保证对旧版的适配
+            //The new version of the family version (7) and the old version of the personal version (2) The same as the home does not modify the old logic (7) to ensure the adaptation of the old version
             return UosHome;
         case 3:
             return UosCommunity;
@@ -715,8 +665,9 @@ DSysInfo::UosEdition DSysInfo::uosEditionType()
 }
 
 /*!
- * \~chinese \brief DSysInfo::osArch 架构信息（使用一个字节的二进制位，从低位到高位）
- * \~chinese \row 【0x8 sw64】【0x4 mips64】【0x2 arm64】【0x1 amd64】
+@~english
+   \brief Architecture information (using bit flags of a byte)
+  【0x8 sw64】【0x4 mips64】【0x2 arm64】【0x1 amd64】
  */
 DSysInfo::UosArch DSysInfo::uosArch()
 {
@@ -734,9 +685,10 @@ static QString getUosVersionValue(const QString &key, const QLocale &locale)
 }
 
 /*!
- * \~chinese \brief DSysInfo::osProductTypeName 版本名称
- * \~chinese \row ProductType[xx] 项对应的值, 如果找不到对应语言的默认使用 ProductType的值(Desktop/Server/Device)
- * \~chinese \param locale 当前系统语言
+@~english
+  \brief Version name
+  ProductType[xx] The corresponding value of the item, if you can't find the value of the corresponding language, use the value of the productType (desktop/server/device)
+  \a locale Current system language
  */
 QString DSysInfo::uosProductTypeName(const QLocale &locale)
 {
@@ -744,9 +696,11 @@ QString DSysInfo::uosProductTypeName(const QLocale &locale)
 }
 
 /*!
- * \~chinese \brief DSysInfo::osSystemName 版本名称
- * \~chinese \row SystemName[xx] 项对应的值, 如果找不到对应语言的默认使用 SystemName 的值 Uniontech OS
- * \~chinese \param locale 当前系统语言
+@~english
+  \brief DSysInfo::osSystemName Version name
+
+  The corresponding value corresponding to SystemName [xx] item, if you can't find the default language of the corresponding language, use the value of SystemName uniontech os
+  \a locale Current system language
  */
 QString DSysInfo::uosSystemName(const QLocale &locale)
 {
@@ -754,9 +708,10 @@ QString DSysInfo::uosSystemName(const QLocale &locale)
 }
 
 /*!
- * \~chinese \brief DSysInfo::osEditionName 版本名称
- * \~chinese \row EditionName[xx] 项对应的值, 如果找不到对应语言的默认使用 EditionName 的值(Professional/Home/Community...)
- * \~chinese \param locale 当前系统语言
+@~english
+  \brief DSysInfo::osEditionName Version name
+   EditionName[xx] The corresponding value of the item, if you can't find the value of the corresponding language, use the value of EditionName (Professional/Home/Community ...)
+  \a locale Current system language
  */
 QString DSysInfo::uosEditionName(const QLocale &locale)
 {
@@ -764,11 +719,12 @@ QString DSysInfo::uosEditionName(const QLocale &locale)
 }
 
 /*!
- * \~chinese \brief DSysInfo::spVersion 阶段版本名称
- * \~chinese \row 小版本号 A-BC-D 中 BC、 A.B.C 中的 B
- * \~chinese \row 返回 SP1-SPxx， 如果正式版返回空
- * \~chinese \row X.Y.Z模式下暂不支持返回此版本号
- * \~chinese \note minVersion.BC == 00：正式版本    minVersion.BC | minVersion.B == 01-99：SP1….SP99
+@~english
+  \brief DSysInfo::spVersion Period version name
+  BC, A.B.C in the small version number a-bc-d
+  Return to SP1-SPXX, if the official version returns empty
+  In the x.y.z mode, it will not support returning this version number for the time being
+  \ note minversion.bc == 00: The official version minversion.bc | minversion.b == 01-99: SP1 ... .sp99
  */
 QString DSysInfo::spVersion()
 {
@@ -794,14 +750,16 @@ QString DSysInfo::spVersion()
         qWarning() << "Getting the SP version in this mode is not supported.";
         return {};
     }
+    return QString();
 }
 
 /*!
- * \~chinese \brief DSysInfo::udpateVersion 更新版本名称
- * \~chinese \row 小版本号 A-BC-D 中 D、A.B.C 模式中的 C
- * \~chinese \row 返回 update1… update9， 如果正式版返回空
- * \~chinese \row X.Y.Z模式下暂不支持返回此版本号
- * \~chinese \note minVersion.D == 0：正式版本    minVersion.D | minVersion.C == 1-9：update1… update9,updateA...updateZ
+@~english
+  \brief DSysInfo::udpateVersion Update version name
+  minor version number D in A-BC-D mode、C in A.B.C mode
+  Return to Update1 ... Update9, if the official version returns to empty
+ In the x.y.z mode, it will not support returning this version number for the time being
+  \note minVersion.D == 0：official version    minVersion.D | minVersion.C == 1-9：update1… update9,updateA...updateZ
  */
 QString DSysInfo::udpateVersion()
 {
@@ -840,9 +798,10 @@ QString DSysInfo::udpateVersion()
 }
 
 /*!
- * \~chinese \brief DSysInfo::majorVersion 主版本号
- * \~chinese \row 主版本号 【20】【23】【25】【26】【29】【30】
- * \~chinese \note 返回 MajorVersion 的值
+@~english
+  \brief Main edition number
+  Main edition number 【20】【23】【25】【26】【29】【30】
+  \note Return to Majorversion value
  */
 QString DSysInfo::majorVersion()
 {
@@ -851,10 +810,11 @@ QString DSysInfo::majorVersion()
 }
 
 /*!
- * \~chinese \brief DSysInfo::minorVersion 小版本号
- * \~chinese \row 【ABCD】 ·[0-9]{4}
- * \~chinese \row【A.B.C】 或者【X.Y.Z】
- * \~chinese \note 返回 MinorVersion 的值
+@~english
+  \brief DSysInfo::minorVersion minor version
+ *【ABCD】 ·[0-9]{4}
+ *【A.B.C】 or【X.Y.Z】
+  @return the value of minorversion
  */
 QString DSysInfo::minorVersion()
 {
@@ -863,14 +823,16 @@ QString DSysInfo::minorVersion()
 }
 
 /*!
- * \~chinese \brief DSysInfo::buildVersion 小版本号
- * \~chinese \row 系统镜像批次号，按时间顺序（不可回退）从100-999递增
- * \~chinese \note 返回 osBuild.xyz 的值
+@~english
+  \brief DSysInfo::buildVersion Small version number
+  System mirror batch number, in order of time (non-retreat) increase from 100-999
+  \note Return  osbuild.xyz value
  */
 QString DSysInfo::buildVersion()
 {
-    siGlobal->ensureOsVersion();
-    return QString::number(siGlobal->osBuild.xyz);
+    DDesktopEntry entry(OS_VERSION_FILE);
+    QString osb = entry.stringValue("OsBuild", "Version");
+    return osb.mid(6).trimmed();
 }
 #endif
 
@@ -903,11 +865,12 @@ QString DSysInfo::distributionInfoSectionName(DSysInfo::OrgType type)
 }
 
 /*!
- * \return the organization name.
- *
- * use \l type as Distribution to get the name of current deepin distribution itself.
- *
- * \sa deepinDistributionInfoPath()
+@~english
+  \return the organization name.
+
+  use \a type as Distribution to get the name of current deepin distribution itself.
+
+  \sa deepinDistributionInfoPath()
  */
 QString DSysInfo::distributionOrgName(DSysInfo::OrgType type, const QLocale &locale)
 {
@@ -926,11 +889,12 @@ QString DSysInfo::deepinDistributorName()
 }
 
 /*!
- * \return the organization website name and url.
- *
- * use \l type as Distribution to get the name of current deepin distribution itself.
- *
- * \sa deepinDistributionInfoPath()
+@~english
+  \return the organization website name and url.
+
+  use \a type as Distribution to get the name of current deepin distribution itself.
+
+  \sa deepinDistributionInfoPath()
  */
 QPair<QString, QString> DSysInfo::distributionOrgWebsite(DSysInfo::OrgType type)
 {
@@ -953,11 +917,12 @@ QPair<QString, QString> DSysInfo::deepinDistributorWebsite()
 }
 
 /*!
- * \return the obtained organization logo path, or the given \l fallback one if there are no such logo.
- *
- * use \l type as Distribution to get the logo of current deepin distribution itself.
- *
- * \sa deepinDistributionInfoPath()
+@~english
+  \return the obtained organization logo path, or the given \a fallback one if there are no such logo.
+
+  use \a type as Distribution to get the logo of current deepin distribution itself.
+
+  \sa deepinDistributionInfoPath()
  */
 QString DSysInfo::distributionOrgLogo(DSysInfo::OrgType orgType, DSysInfo::LogoType type, const QString &fallback)
 {
@@ -1005,16 +970,17 @@ QString DSysInfo::productVersion()
 }
 
 /*!
- * \brief Check if current edition is a community edition
- *
- * Developer can use this way to check if we need enable or disable features
- * for community or enterprise edition.
- *
- * Current rule:
- *  - Professional, Server, Personal edition (DeepinType) will be treat as Enterprise edition.
- *  - Uos (ProductType) will be treat as Enterprise edition.
- *
- * \return true if it's on a community edition distro/installation
+@~english
+  \brief Check if current edition is a community edition
+
+  Developer can use this way to check if we need enable or disable features
+  for community or enterprise edition.
+
+  Current rule:
+   - Professional, Server, Personal edition (DeepinType) will be treat as Enterprise edition.
+   - Uos (ProductType) will be treat as Enterprise edition.
+
+  \return true if it's on a community edition distro/installation
  */
 bool DSysInfo::isCommunityEdition()
 {
@@ -1038,43 +1004,330 @@ bool DSysInfo::isCommunityEdition()
 
 QString DSysInfo::computerName()
 {
-    siGlobal->ensureComputerInfo();
+#ifdef Q_OS_LINUX
+    struct utsname u;
+    if (uname(&u) == 0)
+        siGlobal->computerName = QString::fromLatin1(u.nodename);
 
     return siGlobal->computerName;
+#endif
+    return QString();
 }
 
 QString DSysInfo::cpuModelName()
 {
-    siGlobal->ensureComputerInfo();
+    if (!siGlobal->cpuModelName.isEmpty())
+        return siGlobal->cpuModelName;
+
+#ifdef Q_OS_LINUX
+    static QFile file("/proc/cpuinfo");
+
+    if (file.open(QFile::ReadOnly)) {
+        QMap<QString, QString> map = siGlobal->parseInfoFile(file);
+        if (map.contains("Processor")) {
+            // arm-cpuinfo hw_kirin-cpuinfo
+            siGlobal->cpuModelName = map.value("Processor");
+        } else if (map.contains("model name")) {
+            // cpuinfo
+            siGlobal->cpuModelName = map.value("model name");
+        } else if (map.contains("cpu model")) {
+            // loonson3-cpuinfo sw-cpuinfo
+            siGlobal->cpuModelName = map.value("cpu model");
+        } else if (map.contains("Hardware")) {
+            // "HardWare" field contains cpu info on huawei kirin machine (e.g. klv or klu)
+            siGlobal->cpuModelName = map.value("Hardware");
+        }
+
+        file.close();
+    }
+
+    // Get the cpu info by executing lscpu command
+    if (siGlobal->cpuModelName.isEmpty()) {
+        QProcess lscpu;
+        QStringList env = QProcess::systemEnvironment();
+        env << "LC_ALL=C"; // Add an environment variable
+        lscpu.setEnvironment(env);
+        lscpu.start("/usr/bin/lscpu");
+        if (lscpu.waitForFinished(3000)) {
+            const QMap<QString, QString> map = siGlobal->parseInfoContent(lscpu.readAll());
+            if (map.contains("Model name")) {
+                siGlobal->cpuModelName = map.value("Model name");
+            }
+        } else {
+            qWarning() << "lscpu:" << lscpu.errorString();
+        }
+    }
 
     return siGlobal->cpuModelName;
+#endif
+    return QString();
 }
 
 /*!
- * \return the installed memory size
+@~english
+  \return the installed memory size
  */
 qint64 DSysInfo::memoryInstalledSize()
 {
-    siGlobal->ensureComputerInfo();
+#ifdef Q_OS_LINUX
+    // Getting Memory Installed Size
+    // TODO: way to not dept on lshw?
+    if (!QStandardPaths::findExecutable("lshw").isEmpty()) {
+        QProcess lshw;
+
+        lshw.start("lshw", {"-c", "memory", "-json", "-sanitize"}, QIODevice::ReadOnly);
+
+        if (!lshw.waitForFinished()) {
+            return -1;
+        }
+
+        const QByteArray &lshwInfoJson = lshw.readAllStandardOutput();
+        QJsonArray lshwResultArray = QJsonDocument::fromJson(lshwInfoJson).array();
+        if (!lshwResultArray.isEmpty()) {
+            QJsonValue memoryHwInfo = lshwResultArray.first();
+            QString id = memoryHwInfo.toObject().value("id").toString();
+            Q_ASSERT(id == "memory");
+            siGlobal->memoryInstalledSize = memoryHwInfo.toObject().value("size").toDouble(); // TODO: check "units" is "bytes" ?
+        }
+    }
 
     return siGlobal->memoryInstalledSize;
+#endif
+    return -1;
 }
 
 /*!
- * \return the total available to use memory size
+@~english
+  \return the total available to use memory size
  */
 qint64 DSysInfo::memoryTotalSize()
 {
-    siGlobal->ensureComputerInfo();
-
+#ifdef Q_OS_LINUX
+    siGlobal->memoryAvailableSize = get_phys_pages() * sysconf(_SC_PAGESIZE);
     return siGlobal->memoryAvailableSize;
+#endif
+    return -1;
 }
 
 qint64 DSysInfo::systemDiskSize()
 {
-    siGlobal->ensureComputerInfo();
+#ifdef Q_OS_LINUX
+    // Getting Disk Size
+    QString deviceName;
+    QProcess lsblk;
+
+    lsblk.start("lsblk", {"-Jlpb", "-oNAME,KNAME,PKNAME,SIZE,MOUNTPOINT"}, QIODevice::ReadOnly);
+
+    if (!lsblk.waitForFinished()) {
+        return -1;
+    }
+
+    const QByteArray &diskStatusJson = lsblk.readAllStandardOutput();
+    QJsonDocument diskStatus = QJsonDocument::fromJson(diskStatusJson);
+    QJsonValue diskStatusJsonValue = diskStatus.object().value("blockdevices");
+    QMap<QString, QPair<QString, qulonglong>> deviceParentAndSizeMap;
+
+    if (!diskStatusJsonValue.isUndefined()) {
+        QJsonArray diskStatusArray = diskStatusJsonValue.toArray();
+        QString keyName;
+
+        for (const QJsonValue oneValue : diskStatusArray) {
+            QString name = oneValue.toObject().value("name").toString();
+            QString kname = oneValue.toObject().value("kname").toString();
+            QString pkname = oneValue.toObject().value("pkname").toString();
+            qulonglong size = oneValue.toObject().value("size").toVariant().toULongLong();
+            QString deviceNameMP = oneValue.toObject().value("mountpoint").toString();
+
+            if ("/" ==  deviceNameMP){
+                deviceName = name;
+            }
+
+            if (keyName.isNull() && deviceName == name) {
+                keyName = kname;
+            }
+
+            deviceParentAndSizeMap[kname] = QPair<QString, qulonglong>(pkname, size);
+        }
+
+        while (!deviceParentAndSizeMap[keyName].first.isNull()) {
+            keyName = deviceParentAndSizeMap[keyName].first;
+        }
+
+        siGlobal->diskSize = deviceParentAndSizeMap[keyName].second;
+    }
 
     return siGlobal->diskSize;
+
+#endif
+
+    return -1;
+}
+
+/*! @~english DSysInfo::bootTime
+ * @~english \sa DSysInfo::uptime
+ * @~english \return the boot time(currentDateTime - uptime)
+*/
+QDateTime DSysInfo::bootTime()
+{
+    qint64 ut = uptime();
+    return ut > 0 ? QDateTime::currentDateTime().addSecs(-ut) : QDateTime();
+}
+
+/*! @~english DSysInfo::shutdownTime
+ * @~english \return the last shutdown time
+*/
+QDateTime DSysInfo::shutdownTime()
+{
+    QDateTime dt;
+#if defined Q_OS_LINUX
+    QProcess lastx;
+    lastx.start("last", {"-x", "-F" }, QIODevice::ReadOnly);
+    if (!lastx.waitForFinished()) {
+        qWarning() << lastx.errorString();
+        return QDateTime();
+    }
+
+    while (lastx.canReadLine()) {
+        const QByteArray data = lastx.readLine(1024);
+        //shutdown system down  4.19.0-amd64-des Fri Sep 30 17:53:17 2022 - Sat Oct  8 08:32:47 2022 (7+14:39)
+        if (data.startsWith("shutdown")) {
+            QString timeFmt = QString(data).split(' ', QString::SkipEmptyParts).mid(4, 5).join(' ');
+            dt = QDateTime::fromString(timeFmt);
+            break;
+        }
+    }
+#else
+
+#endif
+    return dt;
+}
+
+/*! @~english DSysInfo::uptime
+ * @~english \return the up time (/proc/uptime)
+*/
+qint64 DSysInfo::uptime()
+{
+#if defined Q_OS_LINUX
+    QFile file("/proc/uptime");
+    if (!file.open(QFile::ReadOnly)) {
+        qWarning() << file.errorString();
+        return -1;
+    }
+
+    QByteArray upTime = file.readAll();
+    bool ok = false;
+    qint64 sec = qCeil(upTime.split(' ').value(0).toDouble(&ok)); // [0]: uptime [1]: idletime
+
+    return ok ? sec : -1;
+#elif defined Q_OS_WIN64
+     return GetTickCount64();
+#elif defined Q_OS_WIN32
+    return GetTickCount();
+#else
+    return -1;
+#endif
+}
+
+/*! @~english DSysInfo::arch
+ * @~english \return the architecture of processor
+*/
+DSysInfo::Arch DSysInfo::arch()
+{
+#if defined(__x86_64__)
+    return X86_64;
+#elif defined(__i386__)
+    return X86;
+#elif defined(__powerpc64__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return PPC64;
+#  else
+    return PPC64_LE;
+#  endif
+#elif defined(__powerpc__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return PPC;
+#  else
+    return PPC_LE;
+#  endif
+#elif defined(__ia64__)
+    return IA64;
+#elif defined(__hppa64__)
+    return PARISC64;
+#elif defined(__hppa__)
+    return PARISC;
+#elif defined(__s390x__)
+    return S390X;
+#elif defined(__s390__)
+    return S390;
+#elif defined(__sparc__) && defined (__arch64__)
+    return SPARC64;
+#elif defined(__sparc__)
+    return SPARC;
+#elif defined(__mips64) && defined(__LP64__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return MIPS64;
+#  else
+    return MIPS64_LE;
+#  endif
+#elif defined(__mips64)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return MIPS64;
+#  else
+    return MIPS64_LE;
+#  endif
+#elif defined(__mips__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return MIPS;
+#  else
+    return MIPS_LE;
+#  endif
+#elif defined(__alpha__)
+    return ALPHA;
+#elif defined(__aarch64__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return ARM64_BE;
+#  else
+    return ARM64;
+#  endif
+#elif defined(__arm__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return ARM_BE;
+#  else
+    return ARM;
+#  endif
+#elif defined(__sh64__)
+    return SH64;
+#elif defined(__sh__)
+    return SH;
+#elif defined(__loongarch64)
+    return LOONGARCH64;
+#elif defined(__m68k__)
+    return M68K;
+#elif defined(__tilegx__)
+    return TILEGX;
+#elif defined(__cris__)
+    return CRIS;
+#elif defined(__nios2__)
+    return NIOS2;
+#elif defined(__riscv)
+#  if __SIZEOF_POINTER__ == 4
+    return RISCV32;
+#  elif __SIZEOF_POINTER__ == 8
+    return RISCV64;
+#  else
+#    error "Unrecognized riscv architecture variant"
+#  endif
+#elif defined(__arc__)
+#  if __BYTE_ORDER == __BIG_ENDIAN
+    return ARC_BE;
+#  else
+    return ARC;
+#  endif
+#elif defined(__sw_64__)
+    return SW_64;
+#else
+#  error "Please register your architecture here!"
+#endif
 }
 
 DCORE_END_NAMESPACE

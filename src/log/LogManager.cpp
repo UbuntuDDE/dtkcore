@@ -1,19 +1,6 @@
-/*
- * Copyright (C) 2017 ~ 2017 Deepin Technology Co., Ltd.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "LogManager.h"
 #include <Logger.h>
@@ -22,16 +9,18 @@
 
 DCORE_BEGIN_NAMESPACE
 
-/**
- * \class DLogManager
- *
- * \brief DLogManager is the deepin user application log manager
+/*!
+@~english
+  \class Dtk::Core::DLogManager
+  \inmodule dtkcore
+
+  \brief DLogManager is the deepin user application log manager.
  */
 
 DLogManager::DLogManager()
 {
 #if !defined(QT_DEBUG) && !defined(QT_MESSAGELOGCONTEXT)
-    m_format = "%{time}{yyyy-MM-dd, HH:mm:ss.zzz} %{message}\n";
+    m_format = "%{time}{yyyy-MM-dd, HH:mm:ss.zzz} [%{type:-7}] %{message}\n";
 #else
     m_format = "%{time}{yyyy-MM-dd, HH:mm:ss.zzz} [%{type:-7}] [%{file:-20} %{function:-35} %{line}] %{message}\n";
 #endif
@@ -51,34 +40,40 @@ void DLogManager::initRollingFileAppender(){
     logger->registerAppender(m_rollingFileAppender);
 }
 
-//! Registers the appender to write the log records to the Console
-/**
- * \sa registerFileAppender
+/*!
+@~english
+  \brief Registers the appender to write the log records to the Console.
+
+  \sa registerFileAppender
  */
 void DLogManager::registerConsoleAppender(){
     DLogManager::instance()->initConsoleAppender();
 }
 
-//! Registers the appender to write the log records to the file
-/**
- * \sa getlogFilePath
- * \sa registerConsoleAppender
+/*!
+@~english
+  \brief Registers the appender to write the log records to the file.
+
+  \sa getlogFilePath
+  \sa registerConsoleAppender
  */
 void DLogManager::registerFileAppender() {
     DLogManager::instance()->initRollingFileAppender();
 }
 
-//! Return the path file log storage
-/**
- * \~chinese \brief DLogManager::getlogFilePath 获取日志文件路径
- * \~chinese \brief 默认日志路径是 ~/.cache/organizationName/applicationName.log
- * \~chinese \brief 如果获取 HOME 环境变量失败将不写日志
- * \sa registerFileAppender
+/*!
+@~english
+  \brief Return the path file log storage.
+
+  \brief DLogManager::getlogFilePath Get the log file path
+  \brief The default log path is ~/.cache/<OrganizationName>/<ApplicationName>.log
+  \brief If the environment variable $HOME cannot be acquired, DLogManager will not log anything
+  \sa registerFileAppender
  */
 QString DLogManager::getlogFilePath()
 {
-    // 不再构造时去设置默认logpath(且mkdir), 而在getlogPath时再去判断是否设置默认值
-    // 修复设置了日志路径还是会在默认的位置创建目录的问题
+    //No longer set the default log path (and mkdir) when constructing now, instead set the default value if it's empty when getlogFilePath is called.
+    //Fix the problem that the log file is still created in the default path when the log path is set manually.
     if (DLogManager::instance()->m_logPath.isEmpty()) {
         if (QDir::homePath() == QDir::rootPath()) {
             qWarning() << "unable to locate the cache directory."
@@ -98,9 +93,10 @@ QString DLogManager::getlogFilePath()
 }
 
 /*!
- * \~chinese \brief DLogManager::setlogFilePath 设置日志文件路径
- * \~chinese \param logFilePath 日志文件路径
- * \~chinese \brief 如果设置的文件路进不是文件路径将什么都不做，输出一条警告
+@~english
+  \brief DLogManager::setlogFilePath Set the log file path
+  \a logFilePath Log file path
+  \brief If the file path set is not the file path, nothing will do, and an output warning
  */
 void DLogManager::setlogFilePath(const QString &logFilePath)
 {

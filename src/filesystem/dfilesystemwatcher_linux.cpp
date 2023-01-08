@@ -1,19 +1,6 @@
-/*
- * Copyright (C) 2017 ~ 2017 Deepin Technology Co., Ltd.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2017 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "dfilesystemwatcher.h"
 #include "private/dfilesystemwatcher_linux_p.h"
@@ -386,12 +373,9 @@ void DFileSystemWatcherPrivate::onDirectoryChanged(const QString &path, bool rem
 }
 
 /*!
-    \class DFileSystemWatcher
-    \inmodule QtCore
+    \class Dtk::Core::DFileSystemWatcher
+    \inmodule dtkcore
     \brief The DFileSystemWatcher class provides an interface for monitoring files and directories for modifications.
-    \ingroup io
-    \since 4.2
-    \reentrant
 
     DFileSystemWatcher monitors the file system for changes to files
     and directories by watching a list of specified paths.
@@ -403,13 +387,6 @@ void DFileSystemWatcherPrivate::onDirectoryChanged(const QString &path, bool rem
     DFileSystemWatcher examines each path added to it. Files that have
     been added to the DFileSystemWatcher can be accessed using the
     files() function, and directories using the directories() function.
-
-    The fileChanged() signal is emitted when a file has been modified,
-    renamed or removed from disk. Similarly, the directoryChanged()
-    signal is emitted when a directory or its contents is modified or
-    removed.  Note that DFileSystemWatcher stops monitoring files once
-    they have been renamed or removed from disk, and directories once
-    they have been removed from disk.
 
     \note On systems running a Linux kernel without inotify support,
     file systems that contain watched paths cannot be unmounted.
@@ -430,9 +407,6 @@ void DFileSystemWatcherPrivate::onDirectoryChanged(const QString &path, bool rem
     being monitored, and these other open descriptors also count in
     the total. OS X uses a different backend and does not
     suffer from this issue.
-
-
-    \sa QFile, QDir
 */
 
 
@@ -451,8 +425,11 @@ DFileSystemWatcher::DFileSystemWatcher(QObject *parent)
         fd = inotify_init1(O_NONBLOCK);
     }
 
-    if (fd != -1)
+    if (fd != -1) {
         d_d_ptr.reset(new DFileSystemWatcherPrivate(fd, this));
+    } else {
+        qCritical() << "inotify_init1 failed, and the DFileSystemWatcher is invalid." << strerror(errno);
+    }
 }
 
 /*!
@@ -496,12 +473,7 @@ DFileSystemWatcher::~DFileSystemWatcher()
 */
 bool DFileSystemWatcher::addPath(const QString &path)
 {
-    if (path.isEmpty()) {
-        qWarning("DFileSystemWatcher::addPath: path is empty");
-        return true;
-    }
-
-    QStringList paths = addPaths(QStringList(path));
+    const QStringList &paths = addPaths(QStringList(path));
     return paths.isEmpty();
 }
 
@@ -532,22 +504,26 @@ QStringList DFileSystemWatcher::addPaths(const QStringList &paths)
 {
     Q_D(DFileSystemWatcher);
 
+    if (!d)
+        return paths;
+
     QStringList p = paths;
     QMutableListIterator<QString> it(p);
 
     while (it.hasNext()) {
         const QString &path = it.next();
-        if (path.isEmpty())
+        if (path.isEmpty()) {
+            qWarning() << Q_FUNC_INFO << "the path is empty and it is not be watched";
             it.remove();
+        }
     }
 
     if (p.isEmpty()) {
-        qWarning("DFileSystemWatcher::addPaths: list is empty");
-        return QStringList();
+        qWarning() << Q_FUNC_INFO << "all path are filtered and they are not be watched, paths are " << paths;
+        return paths;
     }
 
-    if (d)
-        p = d->addPaths(p, &d->files, &d->directories);
+    p = d->addPaths(p, &d->files, &d->directories);
 
     return p;
 }
@@ -564,12 +540,7 @@ QStringList DFileSystemWatcher::addPaths(const QStringList &paths)
 */
 bool DFileSystemWatcher::removePath(const QString &path)
 {
-    if (path.isEmpty()) {
-        qWarning("DFileSystemWatcher::removePath: path is empty");
-        return true;
-    }
-
-    QStringList paths = removePaths(QStringList(path));
+    const QStringList &paths = removePaths(QStringList(path));
     return paths.isEmpty();
 }
 
@@ -588,47 +559,29 @@ QStringList DFileSystemWatcher::removePaths(const QStringList &paths)
 {
     Q_D(DFileSystemWatcher);
 
+    if (!d)
+        return paths;
+
     QStringList p = paths;
     QMutableListIterator<QString> it(p);
 
     while (it.hasNext()) {
         const QString &path = it.next();
-        if (path.isEmpty())
+        if (path.isEmpty()) {
+            qWarning() << Q_FUNC_INFO << "the path is empty and it is not be removed from watched list";
             it.remove();
+        }
     }
 
     if (p.isEmpty()) {
-        qWarning("DFileSystemWatcher::removePaths: list is empty");
-        return QStringList();
+        qWarning() << Q_FUNC_INFO << "all path are filtered and they are not be watched, paths are " << paths;
+        return paths;
     }
 
-    if (d)
-        p = d->removePaths(p, &d->files, &d->directories);
+    p = d->removePaths(p, &d->files, &d->directories);
 
     return p;
 }
-
-/*!
-    \fn void DFileSystemWatcher::fileChanged(const QString &path)
-
-    This signal is emitted when the file at the specified \a path is
-    modified, renamed or removed from disk.
-
-    \sa directoryChanged()
-*/
-
-/*!
-    \fn void DFileSystemWatcher::directoryChanged(const QString &path)
-
-    This signal is emitted when the directory at a specified \a path
-    is modified (e.g., when a file is added or deleted) or removed
-    from disk. Note that if there are several changes during a short
-    period of time, some of the changes might not Q_EMIT this signal.
-    However, the last change in the sequence of changes will always
-    generate this signal.
-
-    \sa fileChanged()
-*/
 
 /*!
     \fn QStringList DFileSystemWatcher::directories() const

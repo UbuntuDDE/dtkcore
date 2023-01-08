@@ -1,19 +1,6 @@
-/*
- * Copyright (C) 2016 ~ 2017 Deepin Technology Co., Ltd.
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+// SPDX-FileCopyrightText: 2016 - 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
 
 #include "dsettingsgroup.h"
 
@@ -48,13 +35,11 @@ public:
 };
 
 /*!
- * \~english \class DSettingsGroup
- * \brief A group of DSettingsOption and DSettingsGroup.
- * DSettingsGroup can contain a lost option and subgroup.
- */
-/*!
- * \chinese \class DSettingsGroup
- * \brief 一组DSettings选项的集合，也可以包含子组。
+@~english
+  @class Dtk::Core::DSettingsGroup
+  \inmodule dtkcore
+  @brief A group of DSettingsOption and DSettingsGroup.
+  DSettingsGroup can contain a lost option and subgroup.
  */
 
 
@@ -70,12 +55,9 @@ DSettingsGroup::~DSettingsGroup()
 }
 
 /*!
- * \~english \brief Get direct parent group of this group.
- * \return
- */
-/*!
- * \~chinese \brief 获取当前组的父组。
- * \return
+@~english
+  @brief Get direct parent group of this group.
+  @return
  */
 QPointer<DSettingsGroup> DSettingsGroup::parentGroup() const
 {
@@ -84,10 +66,8 @@ QPointer<DSettingsGroup> DSettingsGroup::parentGroup() const
 }
 
 /*!
- * \~english \brief Change the direct parent group of this group.
- */
-/*!
- * \~chinese \brief 设置但前组的父组。
+@~english
+  @brief Change the direct \a parentGroup of this group.
  */
 void DSettingsGroup::setParentGroup(QPointer<DSettingsGroup> parentGroup)
 {
@@ -96,11 +76,9 @@ void DSettingsGroup::setParentGroup(QPointer<DSettingsGroup> parentGroup)
 }
 
 /*!
- * \~english \brief Return the full key of this group, include all parent.
- * \return
- */
-/*!
- * \~chinese \brief 返回这个组的键，会包含全部的父组的键。
+@~english
+  @brief Return the full key of this group, include all parent.
+  @return eturn the full key of this group, include all parent.
  */
 QString DSettingsGroup::key() const
 {
@@ -109,10 +87,9 @@ QString DSettingsGroup::key() const
 }
 
 /*!
- * \~english \brief Get display name of this group, it may be translated.
- */
-/*!
- * \~chinese \brief 返回这个组名称。
+@~english
+  @brief Get display name of this group, it may be translated.
+  @return Get display name of this group.
  */
 QString DSettingsGroup::name() const
 {
@@ -121,12 +98,9 @@ QString DSettingsGroup::name() const
 }
 
 /*!
- * \~english \brief Check this group will show on DSettings dialog.
- * \return true if group not bind to ui element.
- */
-/*!
- * \~chinese \brief 检查这个选项组是否会在界面上显示。
- * \return true 表示则这个选项组会显示出来。
+@~english
+  @brief Check this group will show on DSettings dialog.
+  @return true indicates that this option group will be displayed。
  */
 bool DSettingsGroup::isHidden() const
 {
@@ -135,12 +109,11 @@ bool DSettingsGroup::isHidden() const
 }
 
 /*!
- * \~english \brief Get the child group of groupKey
- * \param groupKey is child group key
- */
-/*!
- * \~chinese \brief 返回给定键在选项组中对应的子组。
- * \param groupKey 子组的键
+@~english
+  @brief Get the child group of groupKey
+  \a groupKey is child group key
+
+  @return Returns a pointer to a subgroup.
  */
 QPointer<DSettingsGroup> DSettingsGroup::childGroup(const QString &groupKey) const
 {
@@ -149,12 +122,11 @@ QPointer<DSettingsGroup> DSettingsGroup::childGroup(const QString &groupKey) con
 }
 
 /*!
- * \~english \brief Get the child option of key
- * \param key is child option key
- */
-/*!
- * \~chinese \brief 根据键值获取选项。
- * \param key 选项的完整键
+@~english
+  @brief Get the child option of key
+  \a key is child option key
+
+  @return Returns a pointer to the child option of key.
  */
 QPointer<DSettingsOption> DSettingsGroup::option(const QString &key) const
 {
@@ -163,10 +135,10 @@ QPointer<DSettingsOption> DSettingsGroup::option(const QString &key) const
 }
 
 /*!
- * \~english \brief Enum all direct child group of this group
- */
-/*!
- * \~chinese \brief 列出组下面所有的直接子组。
+@~english
+  @brief Enum all direct child group of this group
+
+  @return Returns a list of all subgroup Pointers.
  */
 QList<QPointer<DSettingsGroup> > DSettingsGroup::childGroups() const
 {
@@ -179,12 +151,9 @@ QList<QPointer<DSettingsGroup> > DSettingsGroup::childGroups() const
 }
 
 /*!
- * \~english \brief Enum all direct child option with the raw order in json description file.
- * \return
- */
-/*!
- * \~chinese \brief 列出组下面所有的直接选项。
- * \return
+@~english
+  @brief Enum all direct child option with the raw order in json description file.
+  @return Returns a list of all suboption Pointers.
  */
 QList<QPointer<DSettingsOption> > DSettingsGroup::childOptions() const
 {
@@ -197,12 +166,9 @@ QList<QPointer<DSettingsOption> > DSettingsGroup::childOptions() const
 }
 
 /*!
- * \~english \brief Enum all direct child option of this group.
- * \return
- */
-/*!
- * \~chinese \brief 列出组下面所有的选项。
- * \return
+@~english
+  @brief Enum all direct child option of this group.
+  @return Returns a list of all option Pointers.
  */
 QList<QPointer<DSettingsOption> > DSettingsGroup::options() const
 {
@@ -211,16 +177,13 @@ QList<QPointer<DSettingsOption> > DSettingsGroup::options() const
 }
 
 /*!
- * \~english \brief Convert QJsonObject to DSettingsGroup.
- * \param prefixKey instead parse prefix key from parent.
- * \param json is an QJsonObejct instance.
- * \sa QPointer<DSettingsOption> Dtk::Core::DSettingsGroup::parseJson(const QString &prefixKey, const QJsonObject &json)
- */
-/*!
- * \~chinese \brief 将json对象转化为DSettingsGroup
- * \param prefixKey 组键值前缀
- * \param json 待反序列化的json对象
- * \sa QPointer<DSettingsOption> Dtk::Core::DSettingsGroup::parseJson(const QString &prefixKey, const QJsonObject &json)
+@~english
+  @brief Convert QJsonObject to DSettingsGroup.
+  \a prefixKey instead parse prefix key from parent.
+  \a group is an QJsonObejct instance.
+  @return Returns a group pointer after parsing json.
+
+  @sa QPointer Dtk::Core::DSettingsOption
  */
 QPointer<DSettingsGroup> DSettingsGroup::fromJson(const QString &prefixKey, const QJsonObject &group)
 {
@@ -230,16 +193,11 @@ QPointer<DSettingsGroup> DSettingsGroup::fromJson(const QString &prefixKey, cons
 }
 
 /*!
- * \~english \brief Parse QJsonObject to DSettingsGroup.
- * \param prefixKey instead parse prefix key from parent.
- * \param json is an QJsonObejct instance.
- * \sa QPointer<DSettingsOption> Dtk::Core::DSettingsGroup::fromJson(const QString &prefixKey, const QJsonObject &json)
- */
-/*!
- * \~chinese \brief 将json对象转化为DSettingsGroup
- * \param prefixKey 组键值前缀
- * \param json 待反序列化的json对象
- * \sa QPointer<DSettingsOption> Dtk::Core::DSettingsGroup::fromJson(const QString &prefixKey, const QJsonObject &json)
+@~english
+  @brief Parse QJsonObject to DSettingsGroup.
+  \a prefixKey instead parse prefix key from parent.
+  \a json is an QJsonObejct instance.
+  @sa QPointer<DSettingsOption> Dtk::Core::DSettingsGroup::fromJson(const QString &prefixKey, const QJsonObject &json)
  */
 void DSettingsGroup::parseJson(const QString &prefixKey, const QJsonObject &group)
 {

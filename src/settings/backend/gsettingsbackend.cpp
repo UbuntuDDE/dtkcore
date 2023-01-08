@@ -1,11 +1,20 @@
-#include "gsettingsbackend.h"
+// SPDX-FileCopyrightText: 2022 UnionTech Software Technology Co., Ltd.
+//
+// SPDX-License-Identifier: LGPL-3.0-or-later
+
+#include "settings/backend/gsettingsbackend.h"
 
 //#include <QDebug>
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QVariant>
+
+#if QT_HAS_INCLUDE(<QGSettings/QGSettings>)
 #include <QGSettings/QGSettings>
+#else
+#include <QGSettings>
+#endif
 
 #include <DSettings>
 
@@ -45,12 +54,14 @@ public:
 };
 
 /*!
- * \class GSettingsBackend
- * \brief Storage backend of DSettings use gsettings.
- *
- * You should generate gsetting schema with /usr/lib/x86_64-linux-gnu/libdtk-$$VERSION/DCore/bin/dtk-settings.
- *
- * You can find this tool from libdtkcore-bin. use /usr/lib/x86_64-linux-gnu/libdtk-$$VERSION/DCore/bin/dtk-settings -h for help.
+@~english
+  @class Dtk::Core::GSettingsBackend
+  \inmodule dtkcore
+  @brief Storage backend of DSettings use gsettings.
+  
+  You should generate gsetting schema with /usr/lib/x86_64-linux-gnu/libdtk-$$VERSION/DCore/bin/dtk-settings.
+  
+  You can find this tool from libdtkcore-bin. use /usr/lib/x86_64-linux-gnu/libdtk-$$VERSION/DCore/bin/dtk-settings -h for help.
  */
 
 GSettingsBackend::GSettingsBackend(DSettings *settings, QObject *parent) :
@@ -84,8 +95,9 @@ GSettingsBackend::~GSettingsBackend()
 }
 
 /*!
- * \brief List all gsettings keys.
- * \return
+@~english
+  @brief List all gsettings keys.
+  @return Return all gsettings keys.
  */
 QStringList GSettingsBackend::keys() const
 {
@@ -94,8 +106,9 @@ QStringList GSettingsBackend::keys() const
 }
 
 /*!
- * \brief Get value of key.
- * \return
+@~english
+  @brief Get value of key.
+  @return Return the value of the given \a key.
  */
 QVariant GSettingsBackend::getOption(const QString &key) const
 {
@@ -104,8 +117,9 @@ QVariant GSettingsBackend::getOption(const QString &key) const
 }
 
 /*!
- * \brief Set value to gsettings
- * \return
+@~english
+  @brief Set value to gsettings
+  Use the \a key to save the \a value.
  */
 void GSettingsBackend::doSetOption(const QString &key, const QVariant &value)
 {
@@ -117,7 +131,8 @@ void GSettingsBackend::doSetOption(const QString &key, const QVariant &value)
 }
 
 /*!
- * \brief Trigger DSettings to sync option to storage.
+@~english
+  @brief Trigger DSettings to sync option to storage.
  */
 void GSettingsBackend::doSync()
 {

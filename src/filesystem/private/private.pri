@@ -1,5 +1,6 @@
 HEADERS += \
-    $$PWD/dbasefilewatcher_p.h
+    $$PWD/dbasefilewatcher_p.h \
+    $$PWD/dcapfsfileengine_p.h
 
 linux {
     HEADERS += \
