@@ -9,10 +9,14 @@ Uploaders:
  Arun Kumar Pariyar <openarungeek@gmail.com>,
  Tu Qinggang <tuqinggang@uniontech.com>,
 Build-Depends:
+ cmake,
  debhelper-compat (= 13),
+ doxygen,
  libdtkcommon-dev,
  libgsettings-qt-dev,
  libgtest-dev,
+ libicu-dev,
+ libuchardet-dev,
  pkg-config,
  qtbase5-dev,
  qtbase5-private-dev,
@@ -28,10 +32,10 @@ Architecture: any
 Section: libdevel
 Multi-Arch: same
 Depends:
+ libdtkcommon-dev,
  libdtkcore5 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends},
- libdtkcommon-dev,
 Breaks:
  libdtkwidget-dev (<< 2.0.5.2-3),
 Replaces:
@@ -47,8 +51,8 @@ Package: libdtkcore5
 Architecture: any
 Multi-Arch: same
 Depends:
- lshw,
  libdtkcommon,
+ lshw,
  ${misc:Depends},
  ${shlibs:Depends},
 Description: Deepin Tool Kit Core library

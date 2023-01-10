@@ -1,3 +1,21 @@
+dtkcore (5.6.4-1ubuntu2) lunar; urgency=medium
+
+  * Rebuid.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Mon, 09 Jan 2023 21:34:15 +0545
+
+dtkcore (5.6.4-1ubuntu1) lunar; urgency=medium
+
+  * Rebuild.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Mon, 09 Jan 2023 16:46:01 +0545
+
+dtkcore (5.6.4-1) lunar; urgency=medium
+
+  * New upstream release.
+
+ -- Arun Kumar Pariyar <openarungeek@gmail.com>  Sun, 08 Jan 2023 19:39:18 +0545
+
 dtkcore (5.5.17.1-1) impish; urgency=medium
 
   * New upstream release.
