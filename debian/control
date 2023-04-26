@@ -12,7 +12,7 @@ Build-Depends:
  cmake,
  debhelper-compat (= 13),
  doxygen,
- libdtkcommon-dev,
+ libdtkcommon-dev (>= 5.6.8~),
  libgsettings-qt-dev,
  libgtest-dev,
  libicu-dev,
