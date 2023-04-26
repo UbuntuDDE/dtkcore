@@ -11,27 +11,32 @@ set(CMAKE_AUTORCC ON)
 set (DSG_PREFIX_PATH "${CMAKE_INSTALL_PREFIX}" CACHE STRING "PREFIX of DSG_DATA_DIRS")
 add_definitions(-DPREFIX="${DSG_PREFIX_PATH}")
 add_definitions(-DLIBDTKCORE_LIBRARY)
-find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
 if(LINUX)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(QGSettings REQUIRED gsettings-qt)
-find_package(Qt5 REQUIRED COMPONENTS DBus)
+  find_package(PkgConfig REQUIRED)
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS DBus)
+  if("${QT_VERSION_MAJOR}" STREQUAL "5")
+      pkg_check_modules(QGSettings REQUIRED IMPORTED_TARGET gsettings-qt) #Dtk6 removed.
+  endif()
+
+  if("${QT_VERSION_MAJOR}" STREQUAL "6")
+    find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core5Compat)
+  endif()
+
+  if(BUILD_WITH_SYSTEMD)
+    pkg_check_modules(Systemd REQUIRED IMPORTED_TARGET libsystemd)
+  endif()
 endif()
-find_package(Qt5 REQUIRED COMPONENTS Xml)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Xml)
 
 # start text encoding
 find_package(ICU REQUIRED COMPONENTS uc)
 pkg_check_modules(uchardet REQUIRED uchardet)
 # end text encoding
 
-# start base 
+# start base
 include(base/base.cmake)
 # end base
-if(LINUX)
-  include(dbus/dbus.cmake)
-endif()
-#message(${dbus_SRCS})
-# end dbus
 
 # start dci
 include(dci/dci.cmake)
@@ -40,14 +45,14 @@ include(dci/dci.cmake)
 #start filesystem
 include(filesystem/filesystem.cmake)
 #end filesystem
-# start log 
+# start log
 include(log/log.cmake)
 #end log
-# start settings 
+# start settings
 include(settings/settings.cmake)
 #end settings
 
-#start utils 
+#start utils
 include(util/util.cmake)
 #end utils
 
@@ -55,8 +60,7 @@ include(util/util.cmake)
 include(glob.cmake)
 #endGLOG
 if(LINUX)
-  add_library(${LIBNAME} SHARED 
-    ${dbus_SRCS}
+  add_library(${LIBNAME} SHARED
     ${base_SRCS}
     ${dci_SRCS}
     ${filesystem_SRCS}
@@ -66,18 +70,35 @@ if(LINUX)
     ${glob_SRC}
   )
   target_link_libraries(
-    ${LIBNAME} PUBLIC 
-    Qt5::Core 
-    Qt5::DBus
-    Qt5::Xml
+    ${LIBNAME} PUBLIC
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::DBus
+    Qt${QT_VERSION_MAJOR}::Xml
   )
   target_link_libraries(${LIBNAME} PRIVATE
-    ${QGSettings_LIBRARIES}
     ICU::uc
+    Qt${QT_VERSION_MAJOR}::CorePrivate
     uchardet
   )
+  if("${QT_VERSION_MAJOR}" STREQUAL "6")
+    target_link_libraries(${LIBNAME} PRIVATE
+      Qt${QT_VERSION_MAJOR}::Core5Compat #TODO: [QTextCodec] : should remove this dependencies
+    )
+  endif()
+  if("${QT_VERSION_MAJOR}" STREQUAL "5")
+    target_link_libraries(${LIBNAME} PRIVATE
+      PkgConfig::QGSettings
+    )
+  endif()
+  if(BUILD_WITH_SYSTEMD)
+    target_link_libraries(${LIBNAME} PRIVATE
+      PkgConfig::Systemd
+    )
+    add_definitions(-DBUILD_WITH_SYSTEMD)
+  endif()
+
 else()
-  add_library(${LIBNAME} SHARED 
+  add_library(${LIBNAME} SHARED
     ${base_SRCS}
     ${dci_SRCS}
     ${filesystem_SRCS}
@@ -87,14 +108,25 @@ else()
     ${glob_SRC}
   )
   target_link_libraries(
-    ${LIBNAME} PUBLIC 
-    Qt5::Core 
-    Qt5::Xml
+    ${LIBNAME} PUBLIC
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Xml
   )
   target_link_libraries(${LIBNAME} PRIVATE
     ICU::uc
+    Qt${QT_VERSION_MAJOR}::CorePrivate
     uchardet
   )
+  if("${QT_VERSION_MAJOR}" STREQUAL "6")
+    target_link_libraries(${LIBNAME} PRIVATE
+      Qt${QT_VERSION_MAJOR}::Core5Compat
+    )
+  endif()
+  if("${QT_VERSION_MAJOR}" STREQUAL "5")
+    target_link_libraries(${LIBNAME} PRIVATE
+      PkgConfig::QGSettings
+    )
+  endif()
 endif()
 set_target_properties(${LIBNAME} PROPERTIES
   VERSION ${CMAKE_PROJECT_VERSION}
@@ -102,8 +134,6 @@ set_target_properties(${LIBNAME} PROPERTIES
   EXPORT_NAME Core
 )
 target_include_directories(${LIBNAME} PRIVATE
-  ${QGSettings_INCLUDE_DIRS}
-  ${Qt5Core_PRIVATE_INCLUDE_DIRS}
   ${uchardet_INCLUDE_DIRS}
 )
 target_include_directories(${LIBNAME} PUBLIC
@@ -140,14 +170,19 @@ install(DIRECTORY ../include/dci/ DESTINATION "${INCLUDE_INSTALL_DIR}" FILES_MAT
 install(DIRECTORY ../include/DtkCore/ DESTINATION "${INCLUDE_INSTALL_DIR}" FILES_MATCHING PATTERN "*")
 install(DIRECTORY ../include/filesystem/ DESTINATION "${INCLUDE_INSTALL_DIR}" FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY ../include/global/ DESTINATION "${INCLUDE_INSTALL_DIR}" FILES_MATCHING PATTERN "*.h")
-file(GLOB TOINSTALLLOG 
+file(GLOB TOINSTALLLOG
   ../include/log/*.h
 )
 install(FILES ${TOINSTALLLOG} DESTINATION "${INCLUDE_INSTALL_DIR}")
-file(GLOB TOINSTALLSETTINGS 
+file(GLOB TOINSTALLSETTINGS
   ../include/settings/*.h
   ../include/settings/backend/*.h
 )
+
+if(${QT_VERSION_MAJOR} STREQUAL "6")
+  list(REMOVE_ITEM TOINSTALLSETTINGS "../include/settings/backend/qsettingbackend.h")
+endif()
+
 install(FILES ${TOINSTALLSETTINGS} DESTINATION "${INCLUDE_INSTALL_DIR}")
 install(DIRECTORY ../include/util/ DESTINATION "${INCLUDE_INSTALL_DIR}" FILES_MATCHING PATTERN "*.h")
 install(TARGETS ${LIBNAME} EXPORT DtkCoreTargets

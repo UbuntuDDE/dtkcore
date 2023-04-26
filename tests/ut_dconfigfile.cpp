@@ -10,9 +10,14 @@
 #include <gtest/gtest.h>
 #include "test_helper.hpp"
 
+#if QT_VERSION >= QT_VERSION_CHECK(6,0,0)
+#define type typeId  // In qt6 type is deprecated and typeId should be used, this macro is for more convenient compatibility with qt6
+#endif
+
 DCORE_USE_NAMESPACE
 
 static constexpr char const *LocalPrefix = "/tmp/example";
+static QString NoAppId;
 
 class ut_DConfigFile : public testing::Test
 {
@@ -32,6 +37,9 @@ protected:
     QString metaPath = QString("%1" PREFIX"/share/dsg/configs/%2").arg(LocalPrefix, APP_ID);
     QString metaGlobalPath = QString("%1" PREFIX"/share/dsg/configs").arg(LocalPrefix);
     QString overridePath = QString("%1" PREFIX"/share/dsg/configs/overrides/%2/%3").arg(LocalPrefix, APP_ID, FILE_NAME);
+    const char *OTHER_APP_ID = "tests_other";
+    QString noAppidMetaPath = QString("%1" PREFIX"/share/dsg/configs").arg(LocalPrefix);
+    QString noAppidOverridePath = QString("%1" PREFIX"/share/dsg/configs/overrides/%2").arg(LocalPrefix, FILE_NAME);
     uint uid = getuid();
     static EnvGuard dsgDataDir;
     static EnvGuard home;
@@ -90,7 +98,7 @@ TEST_F(ut_DConfigFile, testLoad) {
 
 TEST_F(ut_DConfigFile, setValueTypeCheck) {
 
-    FileCopyGuard gurad(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
     DConfigFile config(APP_ID, FILE_NAME);
     config.load(LocalPrefix);
     QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
@@ -123,7 +131,11 @@ TEST_F(ut_DConfigFile, setValueTypeCheck) {
         ASSERT_TRUE(config.setValue("array", array, "test", userCache.get()));
         ASSERT_TRUE(config.setValue("array", QJsonDocument::fromJson("[]").toVariant(), "test", userCache.get()));
         ASSERT_FALSE(config.setValue("array", "", "test", userCache.get()));
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         ASSERT_FALSE(config.setValue("array", "value1", "test", userCache.get()));
+#else
+        ASSERT_TRUE(config.setValue("array", "value1", "test", userCache.get()));
+#endif
         ASSERT_EQ(config.value("array", userCache.get()).type(), type);
     }
     {
@@ -138,7 +150,11 @@ TEST_F(ut_DConfigFile, setValueTypeCheck) {
         ASSERT_TRUE(config.setValue("array_map", array, "test", userCache.get()));
         ASSERT_TRUE(config.setValue("array_map", QJsonDocument::fromJson("[]").toVariant(), "test", userCache.get()));
         ASSERT_FALSE(config.setValue("array_map", "", "test", userCache.get()));
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         ASSERT_FALSE(config.setValue("array_map", "value1", "test", userCache.get()));
+#else
+        ASSERT_TRUE(config.setValue("array_map", "value1", "test", userCache.get()));
+#endif
         ASSERT_EQ(config.value("array_map", userCache.get()).type(), type);
     }
     {
@@ -158,7 +174,18 @@ TEST_F(ut_DConfigFile, setValueTypeCheck) {
         QVariantMap map;
         map.insert("key1", QStringList{"value1"});
         map.insert("key2", QStringList{"value2"});
+        #if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
         ASSERT_EQ(config.value("map_array", userCache.get()).toMap(), map);
+        #else
+        auto ret = config.value("map_array", userCache.get()).toMap();
+        ASSERT_EQ(ret.keys(), map.keys());
+        auto value1 = ret.values();
+        auto value2 = map.values();
+        ASSERT_EQ(value1.size(), value2.size());
+        for(std::size_t i = 0; i < value1.size(); ++i){
+            ASSERT_EQ(value1[i].toStringList(), value2[i].toStringList());
+        }
+        #endif
         ASSERT_TRUE(config.setValue("map_array", QVariantMap(), "test", userCache.get()));
         ASSERT_TRUE(config.setValue("map_array", map, "test", userCache.get()));
         ASSERT_TRUE(config.setValue("map_array", QJsonDocument::fromJson("{}").toVariant(), "test", userCache.get()));
@@ -170,7 +197,7 @@ TEST_F(ut_DConfigFile, setValueTypeCheck) {
 
 TEST_F(ut_DConfigFile, fileIODevice) {
 
-    FileCopyGuard gurad(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
     {
         DConfigFile config(APP_ID, FILE_NAME);
         ASSERT_TRUE(config.load(LocalPrefix));
@@ -201,7 +228,7 @@ TEST_F(ut_DConfigFile, fileIODevice) {
 
 TEST_F(ut_DConfigFile, appmeta) {
 
-    FileCopyGuard gurad(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
     {
         DConfigFile config(APP_ID, FILE_NAME);
 
@@ -215,7 +242,7 @@ TEST_F(ut_DConfigFile, appmeta) {
 
 TEST_F(ut_DConfigFile, globalmeta) {
 
-    FileCopyGuard gurad(":/data/dconf-global.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-global.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
     DConfigFile config(APP_ID, FILE_NAME);
     ASSERT_TRUE(config.load(LocalPrefix));
     QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
@@ -225,15 +252,15 @@ TEST_F(ut_DConfigFile, globalmeta) {
 
 TEST_F(ut_DConfigFile, meta) {
 
-    FileCopyGuard gurad(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
-    FileCopyGuard gurad2(":/data/dconf-global.meta.json", QString("%1/%2.json").arg(metaGlobalPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard2(":/data/dconf-global.meta.json", QString("%1/%2.json").arg(metaGlobalPath, FILE_NAME));
     DConfigFile config(APP_ID, FILE_NAME);
     ASSERT_TRUE(config.load(LocalPrefix));
     QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
     ASSERT_TRUE(userCache->load(LocalPrefix));
     ASSERT_EQ(config.value("key3", userCache.get()), QString("application"));
     const QStringList array{"value1", "value2"};
-    ASSERT_EQ(config.value("array", userCache.get()), array);
+    ASSERT_EQ(config.value("array", userCache.get()).toStringList(), array);
     QVariantMap map;
     map.insert("key1", "value1");
     map.insert("key2", "value2");
@@ -242,7 +269,7 @@ TEST_F(ut_DConfigFile, meta) {
 
 TEST_F(ut_DConfigFile, fileOverride) {
 
-    FileCopyGuard gurad(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
     {
         DConfigFile config(APP_ID, FILE_NAME);
         config.load(LocalPrefix);
@@ -251,7 +278,7 @@ TEST_F(ut_DConfigFile, fileOverride) {
         ASSERT_EQ(config.value("key3", userCache.get()), QString("application"));
     }
 
-    FileCopyGuard gurad1(":/data/dconf-example.override.json", QString("%1/%2.json").arg(overridePath, FILE_NAME));
+    FileCopyGuard guard1(":/data/dconf-example.override.json", QString("%1/%2.json").arg(overridePath, FILE_NAME));
     {
         DConfigFile config(APP_ID, FILE_NAME);
         config.load(LocalPrefix);
@@ -260,7 +287,7 @@ TEST_F(ut_DConfigFile, fileOverride) {
         ASSERT_EQ(config.value("key3", userCache.get()), QString("override"));
     }
 
-    FileCopyGuard gurad2(":/data/dconf-override/dconf-example.override.a.json", QString("%1/a/%2.json").arg(overridePath, FILE_NAME));
+    FileCopyGuard guard2(":/data/dconf-override/dconf-example.override.a.json", QString("%1/a/%2.json").arg(overridePath, FILE_NAME));
     {
         {
             DConfigFile config(APP_ID, FILE_NAME, "/a");
@@ -271,7 +298,7 @@ TEST_F(ut_DConfigFile, fileOverride) {
         }
     }
 
-    FileCopyGuard gurad3(":/data/dconf-override/dconf-example.override.a.b.json", QString("%1/a/b/%2.json").arg(overridePath, FILE_NAME));
+    FileCopyGuard guard3(":/data/dconf-override/dconf-example.override.a.b.json", QString("%1/a/b/%2.json").arg(overridePath, FILE_NAME));
     {
         {
             DConfigFile config(APP_ID, FILE_NAME, "/a/b");
@@ -280,5 +307,114 @@ TEST_F(ut_DConfigFile, fileOverride) {
             ASSERT_TRUE(userCache->load(LocalPrefix));
             ASSERT_EQ(config.value("key3", userCache.get()).toString(), QString("override /a/b"));
         }
+    }
+}
+
+TEST_F(ut_DConfigFile, noAppIdWithGlobalConfiguration) {
+
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(noAppidMetaPath, FILE_NAME));
+    {
+        DConfigFile config(NoAppId, FILE_NAME);
+        ASSERT_TRUE(config.load(LocalPrefix));
+        ASSERT_EQ(config.value("key3"), QString("application"));
+        config.setValue("key3", "global-with-no-appid", "test");
+        config.save(LocalPrefix);
+    }
+    {
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        ASSERT_EQ(config.value("key3"), "global-with-no-appid");
+    }
+}
+
+TEST_F(ut_DConfigFile, noAppIdWithUserConfiguration) {
+
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(noAppidMetaPath, FILE_NAME));
+    {
+        DConfigFile config(NoAppId, FILE_NAME);
+        ASSERT_TRUE(config.load(LocalPrefix));
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        ASSERT_TRUE(userCache->load(LocalPrefix));
+        ASSERT_EQ(config.value("key2", userCache.get()), QString("125"));
+        config.setValue("key2", "user-with-no-appid", "test", userCache.get());
+        ASSERT_TRUE(userCache->save(LocalPrefix));
+    }
+    {
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        ASSERT_EQ(config.value("key2", userCache.get()), "user-with-no-appid");
+    }
+}
+
+TEST_F(ut_DConfigFile, noAppIdUserConfiguration) {
+
+    // meta安装在公共目录，使用空的appid设置配置项， 则无论是否传入appid，获取的是均为空appid的cache值
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(noAppidMetaPath, FILE_NAME));
+    {
+        // 不传入appid设置配置项
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        config.setValue("key2", "user-with-no-appid", "test", userCache.get());
+        userCache->save(LocalPrefix);
+    }
+    {
+        // 不传入appid，获取的为空appid的值
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        ASSERT_EQ(config.value("key2", userCache.get()), "user-with-no-appid");
+    }
+}
+
+TEST_F(ut_DConfigFile, appIdOverrideNoAppIdUserConfiguration) {
+
+    // meta安装在公共目录，appid覆盖了meta文件，使用空的appid设置配置项， 则无论是否传入appid，获取的是均为空appid的cache值
+    FileCopyGuard guard(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(noAppidMetaPath, FILE_NAME));
+    FileCopyGuard guard2(":/data/dconf-example.meta.json", QString("%1/%2.json").arg(metaPath, FILE_NAME));
+    {
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        config.setValue("key2", "user-with-no-appid", "test", userCache.get());
+        userCache->save(LocalPrefix);
+    }
+    {
+        // 不传入appid，获取的为空appid的值
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        ASSERT_EQ(config.value("key2", userCache.get()), "user-with-no-appid");
+    }
+    {
+        // 传入appid设置配置项
+        DConfigFile config(APP_ID, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        config.setValue("key2", "user-with-appid", "test", userCache.get());
+        userCache->save(LocalPrefix);
+    }
+    {
+        // 不传入appid，获取的是空appid的值
+        DConfigFile config(NoAppId, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        ASSERT_EQ(config.value("key2", userCache.get()), "user-with-no-appid");
+    }
+    {
+        // 传入appid，获取的是含appid的值
+        DConfigFile config(APP_ID, FILE_NAME);
+        config.load(LocalPrefix);
+        QScopedPointer<DConfigCache> userCache(config.createUserCache(uid));
+        userCache->load(LocalPrefix);
+        ASSERT_EQ(config.value("key2", userCache.get()).toString().toStdString(), "user-with-appid");
     }
 }
