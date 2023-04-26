@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.10)
 
-set (DVERSION "5.6.4" CACHE STRING "define project version")
+set (DVERSION "5.6.8" CACHE STRING "define project version")
 
 project (DtkCore
   VERSION ${DVERSION}
@@ -13,14 +13,17 @@ message(STATUS ${PROJECT_VERSION})
 include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 
+set(QT_VERSION_MAJOR "5" CACHE STRING "Qt Version")
+message("Current Qt Version: ${QT_VERSION_MAJOR}")
+
 if (CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX /usr)
 endif ()
 set (INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_INCLUDEDIR}/dtk${PROJECT_VERSION_MAJOR}/DCore")
 set (TOOL_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/dtk${PROJECT_VERSION_MAJOR}/DCore/bin")
 set (LIBRARY_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}")
-set (MKSPECS_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt5/mkspecs/modules" CACHE STRING "Install dir for qt pri files")
-set (FEATURES_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt5/mkspecs/features" CACHE STRING "Install dir for qt prf files")
+set (MKSPECS_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt${QT_VERSION_MAJOR}/mkspecs/modules" CACHE STRING "Install dir for qt pri files")
+set (FEATURES_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/qt${QT_VERSION_MAJOR}/mkspecs/features" CACHE STRING "Install dir for qt prf files")
 set (CONFIG_CMAKE_INSTALL_DIR "${CMAKE_INSTALL_LIBDIR}/cmake/DtkCore" CACHE STRING "Install dir for cmake config files")
 
 set (BUILD_EXAMPLES ON CACHE BOOL "Build examples")
@@ -34,8 +37,14 @@ if(UNIX AND NOT APPLE)
 endif()
 set (BUILD_DOCS ON CACHE BOOL "Generate doxygen-based documentation")
 
+set (BUILD_WITH_SYSTEMD OFF CACHE BOOL "Build with systemd")
+
 # CXX FILAGS
-set(CMAKE_CXX_STANDARD 11)
+if("${QT_VERSION_MAJOR}" STREQUAL "5")
+  set(CMAKE_CXX_STANDARD 11)
+else()
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -43,6 +52,7 @@ endif()
 if(NOT MSVC)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fPIC -Wall -Wextra")
   set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -Wl,--as-needed")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--as-needed -pie")
   if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(BUILD_TESTING ON)
   endif ()

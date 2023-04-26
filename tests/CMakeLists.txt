@@ -12,29 +12,32 @@ add_compile_options(-fsanitize=address)
 add_link_options(-fsanitize=address)
 add_definitions(-DPREFIX="${CMAKE_PREFIX_PATH}")
 add_definitions(-DOS_VERSION_TEST_FILE="/tmp/etc/os-version")
-find_package(Qt5 REQUIRED COMPONENTS Gui)
-find_package(Qt5 REQUIRED COMPONENTS Core)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Gui)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core)
 if(LINUX)
-  find_package(Qt5 REQUIRED COMPONENTS DBus)
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS DBus)
   find_package(PkgConfig REQUIRED)
-  pkg_check_modules(QGSettings REQUIRED gsettings-qt)
+  if("${QT_VERSION_MAJOR}" STREQUAL "5")
+    pkg_check_modules(QGSettings REQUIRED IMPORTED_TARGET gsettings-qt)
+  endif()
+  if(BUILD_WITH_SYSTEMD)
+    pkg_check_modules(Systemd REQUIRED IMPORTED_TARGET libsystemd)
+  endif()
 endif()
-find_package(Qt5 REQUIRED COMPONENTS Xml)
-find_package(Qt5 REQUIRED COMPONENTS Concurrent)
-find_package(Qt5 REQUIRED COMPONENTS Test)
+
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Xml)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Concurrent)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Test)
 find_package(GTest REQUIRED)
+
+if("${QT_VERSION_MAJOR}" STREQUAL "6")
+  find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core5Compat)
+endif()
 
 # start base 
 include(../src/base/base.cmake)
 
 # end base
-if(LINUX)
-  include(../src/dbus/dbus.cmake)
-endif()
-#message(${dbus_SRCS})
-# end dbus
-
-
 
 # start dci
 include(../src/dci/dci.cmake)
@@ -62,6 +65,8 @@ include(../src/glob.cmake)
 
 #endglob
 
+# for test.so
+add_subdirectory(./testso)
 
 # test 
 file(GLOB TEST_HEADER
@@ -70,17 +75,19 @@ file(GLOB TEST_HEADER
 file(GLOB TEST_SOURCE
   *.cpp 
 )
+
+if("${QT_VERSION_MAJOR}" STREQUAL "6")
+  list(REMOVE_ITEM TEST_SOURCE "${CMAKE_CURRENT_LIST_DIR}/ut_gsettingsbackend.cpp")
+endif()
+
 set(test_SRC 
   ${TEST_HEADER}
   ${TEST_SOURCE}
 )
 
-
-
 # end test
 if(LINUX)
   add_executable(${BIN_NAME}
-    ${dbus_SRCS}
     ${base_SRCS}
     ${dci_SRCS}
     ${filesystem_SRCS}
@@ -91,29 +98,50 @@ if(LINUX)
     ${test_SRC}
     ./data.qrc
   )
+  add_dependencies(${BIN_NAME} vtabletest)
   target_link_libraries(
-    ${BIN_NAME} PRIVATE 
-    Qt5::Gui 
-    Qt5::Core 
-    Qt5::DBus
-    Qt5::Xml
-    Qt5::Concurrent 
-    Qt5::Test
+    ${BIN_NAME} PRIVATE
+    Qt${QT_VERSION_MAJOR}::Gui
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::CorePrivate
+    Qt${QT_VERSION_MAJOR}::DBus
+    Qt${QT_VERSION_MAJOR}::Xml
+    Qt${QT_VERSION_MAJOR}::Concurrent
+    Qt${QT_VERSION_MAJOR}::Test
     ${GTEST_LIBRARIES}
-    ${QGSettings_LIBRARIES}
     -lpthread
     -lm 
     -lgcov
+    -lvtabletest
   )
+
+  if(${QT_VERSION_MAJOR} STREQUAL "5")
+      target_link_libraries(
+        ${BIN_NAME} PRIVATE
+        PkgConfig::QGSettings
+      )
+  endif()
+
+  if(BUILD_WITH_SYSTEMD)
+    target_link_libraries(
+      ${BIN_NAME} PRIVATE
+      PkgConfig::Systemd
+    )
+  endif()
+
+  if("${QT_VERSION_MAJOR}" STREQUAL "6")
+    target_link_libraries(${BIN_NAME} PRIVATE
+      Qt${QT_VERSION_MAJOR}::Core5Compat
+    )
+  endif()
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(${BIN_NAME} PRIVATE -fprofile-instr-generate -ftest-coverage)
   endif()
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${BIN_NAME} PRIVATE -fprofile-arcs -ftest-coverage)
   endif()
-  target_include_directories( ${BIN_NAME} PUBLIC
-    ${Qt5Core_PRIVATE_INCLUDE_DIRS}
-    ${QGSettings_INCULDE_DIRS}
+  target_link_directories(${BIN_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/testso/)
+  target_include_directories(${BIN_NAME} PUBLIC
     ../include/util/
     ../include/dci/
     ../include/log/
@@ -125,6 +153,7 @@ if(LINUX)
     ../include/filesystem/
     ../include/
     ../src/filesystem/private/
+    ./testso/
   )
 else()
   add_executable(${BIN_NAME}
@@ -138,17 +167,20 @@ else()
     ${test_SRC}
     ./data.qrc
   )
+  add_dependencies(${BIN_NAME} vtabletest)
   target_link_libraries(
-    ${BIN_NAME} PRIVATE 
-    Qt5::Gui
-    Qt5::Core
-    Qt5::Xml
-    Qt5::Concurrent
-    Qt5::Test
+    ${BIN_NAME} PRIVATE
+    Qt${QT_VERSION_MAJOR}::Gui
+    Qt${QT_VERSION_MAJOR}::CorePrivate
+    Qt${QT_VERSION_MAJOR}::Core
+    Qt${QT_VERSION_MAJOR}::Xml
+    Qt${QT_VERSION_MAJOR}::Concurrent
+    Qt${QT_VERSION_MAJOR}::Test
     ${GTEST_LIBRARIES}
     -lpthread
     -lm 
     -lgcov
+    -lvtabletest
   )
   if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
     target_compile_options(${BIN_NAME} PRIVATE -fprofile-instr-generate -ftest-coverage)
@@ -156,8 +188,8 @@ else()
   if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(${BIN_NAME} PRIVATE -fprofile-arcs -ftest-coverage)
   endif()
+  target_link_directories(${BIN_NAME} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/testso/)
   target_include_directories( ${BIN_NAME} PUBLIC
-    ${Qt5Core_PRIVATE_INCLUDE_DIRS}
     ../include/util/
     ../include/dci/
     ../include/log/
@@ -168,6 +200,7 @@ else()
     ../include/settings/
     ../include/filesystem/
     ../include/
+    ./testso/
   )
 endif()
 

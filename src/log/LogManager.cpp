@@ -6,6 +6,7 @@
 #include <Logger.h>
 #include <ConsoleAppender.h>
 #include <RollingFileAppender.h>
+#include <JournalAppender.h>
 
 DCORE_BEGIN_NAMESPACE
 
@@ -19,11 +20,7 @@ DCORE_BEGIN_NAMESPACE
 
 DLogManager::DLogManager()
 {
-#if !defined(QT_DEBUG) && !defined(QT_MESSAGELOGCONTEXT)
-    m_format = "%{time}{yyyy-MM-dd, HH:mm:ss.zzz} [%{type:-7}] %{message}\n";
-#else
     m_format = "%{time}{yyyy-MM-dd, HH:mm:ss.zzz} [%{type:-7}] [%{file:-20} %{function:-35} %{line}] %{message}\n";
-#endif
 }
 
 void DLogManager::initConsoleAppender(){
@@ -38,6 +35,15 @@ void DLogManager::initRollingFileAppender(){
     m_rollingFileAppender->setLogFilesLimit(5);
     m_rollingFileAppender->setDatePattern(RollingFileAppender::DailyRollover);
     logger->registerAppender(m_rollingFileAppender);
+}
+
+
+void DLogManager::initJournalAppender()
+{
+#if (defined BUILD_WITH_SYSTEMD && defined Q_OS_LINUX)
+    m_journalAppender = new JournalAppender();
+    logger->registerAppender(m_journalAppender);
+#endif
 }
 
 /*!
@@ -59,6 +65,11 @@ void DLogManager::registerConsoleAppender(){
  */
 void DLogManager::registerFileAppender() {
     DLogManager::instance()->initRollingFileAppender();
+}
+
+void DLogManager::registerJournalAppender()
+{
+    DLogManager::instance()->initJournalAppender();
 }
 
 /*!

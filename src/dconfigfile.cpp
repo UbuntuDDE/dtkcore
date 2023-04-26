@@ -619,7 +619,7 @@ public:
         const auto &dataPaths = DStandardPaths::paths(DStandardPaths::DSG::DataDir);
         paths.reserve(dataPaths.size());
         for (auto item : dataPaths) {
-            paths.prepend(QString("%1/%2/configs/%3").arg(prefix, item, configKey.appId));
+            paths.prepend(QDir::cleanPath(QString("%1/%2/configs/%3").arg(prefix, item, configKey.appId)));
         }
         return paths;
     }
@@ -627,7 +627,7 @@ public:
     inline static QStringList genericMetaDirs(const QString &prefix) {
         QStringList paths;
         for (auto item: DStandardPaths::paths(DStandardPaths::DSG::DataDir)) {
-            paths.prepend(QString("%1/%2/configs").arg(prefix, item));
+            paths.prepend(QDir::cleanPath(QString("%1/%2/configs").arg(prefix, item)));
         }
         return paths;
     }
@@ -1016,7 +1016,7 @@ public:
 #endif
         }
 
-        return QString("%1/%2/configs/%3").arg(prefix, appDataDir, configKey.appId);
+        return QDir::cleanPath(QString("%1/%2/configs/%3").arg(prefix, appDataDir, configKey.appId));
     }
 
     QString getCacheDir(const QString &localPrefix = QString())
@@ -1124,6 +1124,7 @@ bool DConfigCacheImpl::save(const QString &localPrefix, QJsonDocument::JsonForma
     if (!cacheChanged)
         return true;
 
+    cacheChanged = false;
     const QString &dir = getCacheDir(localPrefix);
     if (dir.isEmpty()) {
         qCWarning(cfLog, "Falied on saveing, the config cache directory is empty for the user[%d], "
@@ -1202,16 +1203,28 @@ public:
             } else {
                 const auto &metaValue = configMeta->value(key);
                 // sample judgement to reduce a copy of convert.
-                if (metaValue.type() == value.type())
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+                if (metaValue.typeId() == value.typeId())
                     return cache->setValue(key, value, configMeta->serial(key), cache->uid(), appid);
 
                 // convert copy to meta's type, it promises `setValue` don't change meta's type.
+                auto copy = value;
+                if (!copy.convert(metaValue.metaType())) {
+                    qCWarning(cfLog) << "check type error, meta type is " << metaValue.metaType().name()
+                                     << ", and now type is " << value.metaType().name();
+                    return false;
+                }
+#else
+                if (metaValue.type() == value.type())
+                    return cache->setValue(key, value, configMeta->serial(key), cache->uid(), appid);
+
                 auto copy = value;
                 if (!copy.convert(metaValue.userType())) {
                     qCWarning(cfLog) << "check type error, meta type is " << metaValue.type()
                                      << ", and now type is " << value.type();
                     return false;
                 }
+#endif
 
                 return cache->setValue(key, copy, configMeta->serial(key), cache->uid(), appid);
             }
@@ -1225,7 +1238,7 @@ public:
         }
         return userCache;
     }
-    QVariant value(const QString &key, DConfigCache *userCache) const
+    QVariant cacheValue(DConfigCache *userCache, const QString &key) const
     {
         // 检查权限
         if (configMeta->permissions(key) != DConfigFile::ReadOnly) {
@@ -1237,7 +1250,13 @@ public:
                 }
             }
         }
-
+        return QVariant();
+    }
+    QVariant value(const QString &key, DConfigCache *userCache) const
+    {
+        const QVariant &v = cacheValue(userCache, key);
+        if (v.isValid())
+            return v;
         return configMeta->value(key);
     }
 
@@ -1281,8 +1300,6 @@ constexpr DConfigFile::Version DConfigFile::supportedVersion()
 DConfigFile::DConfigFile(const QString &appId, const QString &name, const QString &subpath)
     : DObject(*new DConfigFilePrivate(this, appId, name, subpath))
 {
-    Q_ASSERT(!name.isEmpty());
-
     D_D(DConfigFile);
     d->globalCache = new DConfigCacheImpl(d->configKey, InvalidUID, true);
 }
@@ -1340,7 +1357,7 @@ bool DConfigFile::save(const QString &localPrefix, QJsonDocument::JsonFormat for
 @~english
  * @brief DConfigFile::value
  * @param key Configuration name
- * @param uid User id, uid is invalid when the key is global
+ * @param userCache Specific user cache, \a userCache is unused when the key is global
  * @return
  */
 QVariant DConfigFile::value(const QString &key, DConfigCache *userCache) const
@@ -1350,11 +1367,23 @@ QVariant DConfigFile::value(const QString &key, DConfigCache *userCache) const
 }
 
 /*!
+ * \brief DConfigFile::cacheValue Get a specific user cache's value
+ * \param userCache Specific user cache, it is unused if the \a key is global configuration item
+ * \param key Configuration name
+ * \return
+ */
+QVariant DConfigFile::cacheValue(DConfigCache *userCache, const QString &key) const
+{
+    D_DC(DConfigFile);
+    return d->cacheValue(userCache, key);
+}
+
+/*!
 @~english
     @brief Sets the value in the cache
     \a key Configuration name
     \a value The value to set
-    \a uid User id at setup time
+    \a userCache Specific user cache at setup time
     \a appid Application id at setup time
     @return A value of true indicates that the new value has been reset, and false indicates that it has not been set
  */
